@@ -64,9 +64,11 @@ svg{display:block}
 .land{fill:var(--land);stroke:var(--coast);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 .land.pt{fill:var(--land-pt)}
 .sealbl{fill:var(--text3);font-size:15px;letter-spacing:.3em;text-transform:uppercase;opacity:.55;font-weight:600}
-.ln-hs{fill:none;stroke:var(--hs);stroke-width:2.6;vector-effect:non-scaling-stroke;stroke-linecap:round}
-.ln-cv{fill:none;stroke:var(--cv);stroke-width:1.6;stroke-dasharray:5 4;vector-effect:non-scaling-stroke;stroke-linecap:round}
+.ln-hs{fill:none;stroke:var(--hs);stroke-width:3.4;vector-effect:non-scaling-stroke;stroke-linecap:butt;opacity:.9}
+.ln-hs2{fill:none;stroke:var(--land);stroke-width:1.3;stroke-dasharray:7 7;vector-effect:non-scaling-stroke}
+.ln-cv{fill:none;stroke:var(--cv);stroke-width:1.8;vector-effect:non-scaling-stroke;stroke-linecap:butt;opacity:.85}
 .no-cv .ln-cv{display:none}
+.tr .hd path{filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
 .hl-case{fill:none;stroke:var(--solid);stroke-width:8;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .hl-line{fill:none;stroke-width:4.5;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .hl-done{fill:none;stroke:var(--text3);stroke-width:4.5;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
@@ -79,7 +81,7 @@ svg{display:block}
 .st .ring{display:none;fill:none;stroke:var(--accent);stroke-width:2.5}
 .st.sel .ring{display:block}
 .st.flt .dot{fill:var(--accent);stroke:var(--accent)}
-.tr .body{stroke:#fff;stroke-width:2}
+.tr .body{stroke:#fff;stroke-width:2.2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .tr .hd{pointer-events:none}
 .tr .num{display:none;fill:var(--lbl);font-size:11px;font-weight:700;paint-order:stroke;stroke:var(--halo);stroke-width:3.5px;pointer-events:none}
 #map[data-z="2"] .tr .num{display:block}
@@ -591,12 +593,16 @@ function persist(){try{localStorage.setItem(KEY,JSON.stringify({settings:X.setti
 const REAL={on:false,list:[],ts:0,err:'',els:{},prevD:{}};
 const showDemo=()=>X.settings.source==='demo'||(!REAL.on&&X.settings.source!=='real');
 const nm=o=>o.real?o.name:nm(o);
+function snapNet(x,y,maxKm){let best=null;for(const e of EDGES){const A=S[e.a],B=S[e.b],vx=B.x-A.x,vy=B.y-A.y,t=clamp(((x-A.x)*vx+(y-A.y)*vy)/(vx*vx+vy*vy),0,1),px=A.x+t*vx,py=A.y+t*vy,d=Math.hypot(x-px,y-py)/KMU;if(!best||d<best.d)best={d,px,py,ang:Math.atan2(vy,vx)*180/Math.PI}}return best&&best.d<=maxKm?best:null}
 function realSync(){const seen=new Set();
   for(const t of REAL.list){seen.add(t.id);let e=REAL.els[t.id];
     if(!e){const g=el('g',{class:'tr real','data-real':t.id});
-      g.innerHTML='<g class="hd"><path d="M15 0 8 -5.5 8 5.5Z" fill="#0a74f0"/></g><circle class="sel" r="13"/><circle class="body" r="7" fill="#0a74f0"/><circle r="16" fill="transparent"/><text class="num" x="11" y="-9"></text>';
-      g.lastChild.textContent=t.label;$('#trains').append(g);e=REAL.els[t.id]={g,hd:g.firstChild,x:WXf(t.lon),y:WYf(t.lat)}}
-    const nx=WXf(t.lon),ny=WYf(t.lat);if(t.bearing!=null)e.ang=t.bearing;else if(Math.hypot(nx-e.tx||0,ny-e.ty||0)>0.05)e.ang=Math.atan2(ny-e.ty,nx-e.tx)*180/Math.PI+90;e.tx=nx;e.ty=ny}
+      g.innerHTML='<g class="hd"><path d="M12 0 7 -4.2 7 4.2Z" fill="#0a74f0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></g><circle class="sel" r="11"/><circle class="body" r="5.6" fill="#0a74f0"/><circle r="15" fill="transparent"/><text class="num" x="10" y="-8"></text>';
+      g.lastChild.textContent=t.label;$('#trains').append(g);e=REAL.els[t.id]={g,hd:g.firstChild,x:WXf(t.lon),y:WYf(t.lat),tx:WXf(t.lon),ty:WYf(t.lat),ang:90}}
+    const rx=WXf(t.lon),ry=WYf(t.lat);let m=null;if(t.bearing!=null)m=t.bearing-90;else if(e.rx!=null&&Math.hypot(rx-e.rx,ry-e.ry)>0.05)m=Math.atan2(ry-e.ry,rx-e.rx)*180/Math.PI;
+    e.rx=rx;e.ry=ry;const sn=snapNet(rx,ry,25);let nx=rx,ny=ry,a=m;
+    if(sn){nx=sn.px;ny=sn.py;a=sn.ang;if(m!=null&&Math.cos((m-sn.ang)*Math.PI/180)<0)a+=180}
+    if(a!=null)e.ang=a+90;e.tx=nx;e.ty=ny}
   for(const id in REAL.els)if(!seen.has(id)){REAL.els[id].g.remove();delete REAL.els[id]}}
 async function pollReal(){
   if(X.settings.source==='demo'){REAL.on=false;REAL.err='';REAL.list=[];realSync();renderChips();return}
@@ -634,12 +640,12 @@ function buildMap(){
   ISL.forEach(i=>$('#geo').append(el('path',{d:pathOf(i),class:'land'})));
   [['Mar Cantábrico',-4.4,43.95],['Atlántico',-8.9,36.2],['Mar Mediterráneo',1.2,38.2]].forEach(([t,lo,la])=>$('#seal').append(el('text',{x:WXf(lo),y:WYf(la),class:'sealbl','text-anchor':'middle'},t)));
   const hs=[],cv=[];EDGES.forEach(e=>{const a=S[e.a],b=S[e.b],s=`M${a.x.toFixed(1)} ${a.y.toFixed(1)}L${b.x.toFixed(1)} ${b.y.toFixed(1)}`;(e.t==='hs'?hs:cv).push(s)});
-  $('#lines').append(el('path',{d:cv.join(''),class:'ln-cv'}),el('path',{d:hs.join(''),class:'ln-hs'}));
+  $('#lines').append(el('path',{d:cv.join(''),class:'ln-cv'}),el('path',{d:hs.join(''),class:'ln-hs'}),el('path',{d:hs.join(''),class:'ln-hs2'}));
   STL.forEach(s=>{const g=el('g',{class:'st'+(s.major?' major':''),'data-st':s.id});
     g.innerHTML=`<circle class="ring" r="${s.major?11:9}"/><circle class="dot" r="${s.major?5:3.6}"/><circle r="15" fill="transparent"/><text class="lb" x="${s.x>900?-(s.major?9:7):(s.major?9:7)}" y="4"${s.x>900?' text-anchor="end"':''}>${esc(s.short)}</text>`;
     $('#stations').append(g);stEls[s.id]={g,s}});
   TRAINS.forEach(tr=>{const g=el('g',{class:'tr','data-train':tr.id});
-    g.innerHTML=`<g class="hd"><path d="M15 0 8 -5.5 8 5.5Z" fill="${tr.c}"/></g><circle class="sel" r="13"/><circle class="mine" r="13"/><circle class="body" r="7.5" fill="${tr.c}"/><circle class="dl" cx="6" cy="-6" r="3.2"/><circle r="16" fill="transparent"/><text class="num" x="11" y="-9">${tr.num}</text>`;
+    g.innerHTML=`<g class="hd"><path d="M12 0 7 -4.2 7 4.2Z" fill="${tr.c}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></g><circle class="sel" r="11"/><circle class="mine" r="11"/><circle class="body" r="5.6" fill="${tr.c}"/><circle class="dl" cx="5" cy="-5" r="2.5"/><circle r="15" fill="transparent"/><text class="num" x="10" y="-8">${tr.num}</text>`;
     $('#trains').append(g);trEls[tr.id]={g,hd:g.firstChild,tr}});
   const ug=$('#userG');ug.innerHTML=`<g id="ringG"></g><g class="user" id="userMark"><circle class="halo" r="14"/><circle r="22" fill="transparent"/><circle class="me" r="8"/><text class="ulb" x="13" y="-11">Tú</text></g>`;
   [['rg3','var(--lvl3)'],['rg2','var(--lvl2)'],['rg1','var(--lvl1)']].forEach(([id,c])=>$('#ringG').append(el('circle',{id,class:'rg',stroke:c,fill:c})));
