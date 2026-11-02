@@ -596,7 +596,7 @@ function realSync(){const seen=new Set();
     if(!e){const g=el('g',{class:'tr real','data-real':t.id});
       g.innerHTML='<g class="hd"><path d="M15 0 8 -5.5 8 5.5Z" fill="#0a74f0"/></g><circle class="sel" r="13"/><circle class="body" r="7" fill="#0a74f0"/><circle r="16" fill="transparent"/><text class="num" x="11" y="-9"></text>';
       g.lastChild.textContent=t.label;$('#trains').append(g);e=REAL.els[t.id]={g,hd:g.firstChild,x:WXf(t.lon),y:WYf(t.lat)}}
-    e.tx=WXf(t.lon);e.ty=WYf(t.lat);e.ang=t.bearing||0}
+    const nx=WXf(t.lon),ny=WYf(t.lat);if(t.bearing!=null)e.ang=t.bearing;else if(Math.hypot(nx-e.tx||0,ny-e.ty||0)>0.05)e.ang=Math.atan2(ny-e.ty,nx-e.tx)*180/Math.PI+90;e.tx=nx;e.ty=ny}
   for(const id in REAL.els)if(!seen.has(id)){REAL.els[id].g.remove();delete REAL.els[id]}}
 async function pollReal(){
   if(X.settings.source==='demo'){REAL.on=false;REAL.err='';REAL.list=[];realSync();renderChips();return}

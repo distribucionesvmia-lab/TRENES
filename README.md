@@ -1,7 +1,7 @@
 # RailTrack España (con datos en directo)
 
 Mapa ferroviario de España. Si el servidor responde, muestra los trenes reales del feed abierto de Renfe
-(GTFS-Realtime: posición, velocidad y retraso). Si no, usa una demostración simulada, claramente etiquetada.
+(gtfsrt.renfe.com, JSON: Cercanías más Alta Velocidad, Larga y Media Distancia). Si no, usa una demostración simulada, claramente etiquetada.
 
 ## Publicar en Vercel
 1. Sube esta carpeta a un repositorio de GitHub (o usa `npx vercel` desde esta carpeta).
@@ -14,7 +14,7 @@ Mapa ferroviario de España. Si el servidor responde, muestra los trenes reales 
 ## Comprobar que funciona
 Abre `https://TU-SITIO/api/trains`. Debe devolver un JSON con `trains`.
 - Si da error 502, Renfe habrá cambiado las URLs del feed: define las variables de entorno
-  `RENFE_VP_URL` (posiciones) y `RENFE_TU_URL` (retrasos) con las direcciones actuales
+  `RENFE_VP_URLS` (posiciones) y `RENFE_TU_URLS` (retrasos), varias direcciones separadas por coma con las direcciones actuales
   (están en el portal de datos abiertos de Renfe, buscar «GTFS-Realtime»).
 - En la app, Ajustes > Fuente de datos permite forzar En directo o Demo.
 

@@ -1,7 +1,6 @@
 {
   "name": "railtrack-espana",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "engines": { "node": ">=18" },
-  "dependencies": { "gtfs-realtime-bindings": "^1.1.1" }
+  "engines": { "node": ">=18" }
 }
