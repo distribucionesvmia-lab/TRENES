@@ -593,9 +593,23 @@ X.settings.island=false;X.settings.source='real';X.favs.trains=(X.favs.trains||[
 function persist(){try{localStorage.setItem(KEY,JSON.stringify({settings:X.settings,favs:X.favs,hist:X.hist.slice(0,40)}))}catch(e){storageOK=false}}
 
 /* ---------- datos en directo (función /api/trains) ---------- */
-const REAL={tried:false,on:false,list:[],ts:0,err:'',els:{},prevD:{}};
+const REAL={hist:{},tried:false,on:false,list:[],ts:0,err:'',els:{},prevD:{}};
 const showDemo=()=>false;
 const nm=o=>o.real?o.name:nm(o);
+function inPoly(x,y,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c}
+let SP_W=null,PT_W=null;
+function netKm(x,y){let m=1e9;for(const e of EDGES){const A=S[e.a],B=S[e.b],vx=B.x-A.x,vy=B.y-A.y,t=clamp(((x-A.x)*vx+(y-A.y)*vy)/(vx*vx+vy*vy),0,1);m=Math.min(m,Math.hypot(x-(A.x+t*vx),y-(A.y+t*vy))/KMU)}return m}
+/* Un tren es creíble si está sobre tierra (España o Portugal) o muy cerca de la red; así se descartan posiciones en el mar o sin sentido */
+function plausible(t){if(!(t.lat>35&&t.lat<44.5&&t.lon>-10&&t.lon<4.6))return false;if(!SP_W){SP_W=SPAIN.map(([lo,la])=>[WXf(lo),WYf(la)]);PT_W=PORT.map(([lo,la])=>[WXf(lo),WYf(la)])}const x=WXf(t.lon),y=WYf(t.lat);
+  const onLand=inPoly(x,y,SP_W)||inPoly(x,y,PT_W);const d=netKm(x,y);return onLand?d<=60:d<=12}
+function estSpeed(t,now){if(t.speed!=null)return;const h=REAL.hist[t.id];
+  if(!h){REAL.hist[t.id]={lat:t.lat,lon:t.lon,t:now,time:t.time,v:null};return}
+  const dkm=hav(h.lon,h.lat,t.lon,t.lat);
+  if(dkm>0.04){const dt=((t.time&&h.time&&t.time!==h.time)?(t.time-h.time):(now-h.t))/1000;
+    if(dt>=3){let v=dkm/dt*3600;if(v>350)v=h.v!=null?h.v:null;if(v!=null){v=h.v!=null?0.5*h.v+0.5*v:v;h.v=v}
+      h.lat=t.lat;h.lon=t.lon;h.t=now;h.time=t.time}}
+  else if(now-h.t>75000){h.v=0}
+  if(h.v!=null){t.speed=Math.round(h.v);t.speedEst=true}}
 function tileKey(x,y){return Math.floor(LONf(x))+','+Math.floor(LATf(y))}
 function snapRails(x,y){const tol=3*KMU;let best=null;
   for(const w of RAILS.ways){const b=w.bb;if(x<b[0]-tol||x>b[2]+tol||y<b[1]-tol||y>b[3]+tol)continue;const P=w.pts;
@@ -618,7 +632,7 @@ function realSync(){const seen=new Set();
 async function pollReal(){
   try{const r=await fetch('/api/trains',{cache:'no-store'});if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(_){}throw new Error(m)}
     const j=await r.json();if(!j||!Array.isArray(j.trains))throw new Error('Respuesta con formato inesperado');
-    REAL.list=j.trains;REAL.ts=Date.now();REAL.on=j.trains.length>0;REAL.err=REAL.on?'':'El feed no devolvió trenes en este momento.'}
+    REAL.list=j.trains.filter(plausible);REAL.hidden=j.trains.length-REAL.list.length;REAL.ts=Date.now();REAL.list.forEach(t=>estSpeed(t,REAL.ts));REAL.on=REAL.list.length>0;REAL.err=REAL.on?'':'El feed no devolvió trenes en este momento.'}
   catch(e){REAL.err='No se pudo leer el feed de Renfe ('+(e.message||e)+').';if(!REAL.list.length)REAL.on=false}
   REAL.tried=true;realSync();renderChips();
   if(X.view==='list'||X.view==='follow'||X.view==='saved')renderView(true);else if(X.view==='real'&&!REAL.list.find(t=>t.id===X.selReal))deselect()}
@@ -807,7 +821,7 @@ function search(q){const nq=norm(q);if(!nq){closeResults();return}
   if(false){const a=found[0].s,b=found[1].s,n=TRAINS.filter(t=>t.stops.has(a.id)&&t.stops.has(b.id)).length;
     h+=`<h4>Trayecto</h4><button class="res" data-a="routeFilter" data-x="${a.id}" data-y="${b.id}"><span class="ri">${I.route}</span><span><b>${esc(a.short)} ⇄ ${esc(b.short)}</b><small>${n?n+' trenes simulados cubren este trayecto':'Ningún tren simulado cubre este trayecto'}</small></span></button>`}
   if(sts.length)h+=`<h4>Estaciones</h4>`+sts.map(s=>`<button class="res" data-a="selStation" data-id="${s.id}"><span class="ri">${I.pin}</span><span><b>${esc(s.name)}</b><small>Estación${s.major?' principal':''}</small></span></button>`).join('');
-  if(trs.length)h+=`<h4>Trenes en directo</h4>`+trs.map(t=>`<button class="res" data-a="selReal" data-id="${esc(t.id)}"><span class="ri" style="background:var(--accent);color:#fff">${I.train}</span><span><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}${t.speed!=null?' · '+t.speed+' km/h':''}</small></span></button>`).join('');
+  if(trs.length)h+=`<h4>Trenes en directo</h4>`+trs.map(t=>`<button class="res" data-a="selReal" data-id="${esc(t.id)}"><span class="ri" style="background:var(--accent);color:#fff">${I.train}</span><span><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}${t.speed!=null?' · '+spd(t):''}</small></span></button>`).join('');
   if(!h)h=`<div class="empty"><b>Sin resultados para «${esc(q)}»</b><br>Prueba con el nombre de una estación («Sevilla») o el código de un tren en circulación.</div>`;
   resEl.innerHTML=h;resEl.hidden=false}
 qEl.addEventListener('input',()=>{$('#qclear').hidden=!qEl.value;search(qEl.value)});
@@ -825,6 +839,7 @@ $('#grab').addEventListener('pointerup',()=>{if(gy==null)return;const i=SNAPS.in
   if(Math.abs(gdy)<8)setSnap(SNAPS[(i+1)%3]);else if(gdy<0)setSnap(SNAPS[Math.min(2,i+1)]);else setSnap(SNAPS[Math.max(0,i-1)]);gy=null});
 const headHTML=({back,title,sub,actions=''})=>`<div class="hrow">${back?`<button class="ib" data-a="back" aria-label="Volver">${I.back}</button>`:''}<div class="ht"><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div><div class="ha">${actions}</div></div>`;
 const sb=svc=>`<span class="sb" style="--c:${SVC[svc].c}">${esc(SVC[svc].n)}</span>`;
+const spd=t=>t.speed==null?'—':(t.speedEst?'≈ ':'')+t.speed+' km/h';
 const pill=(txt,cls)=>`<span class="pill ${cls}">${esc(txt)}</span>`;
 const isFavTrain=id=>X.favs.trains.includes(id),isFavSt=id=>X.favs.stations.includes(id),isFavRoute=(a,b)=>X.favs.routes.some(r=>r.a===a&&r.b===b);
 const emptyBox=(t,d,btn='')=>`<div class="empty"><b>${t}</b><br>${d}${btn?`<div class="btns" style="justify-content:center">${btn}</div>`:''}</div>`;
@@ -841,7 +856,7 @@ VIEWS.list={render(){const n=REAL.on?REAL.list.length:visibleTrains().length;
   body:`<div id="listBody"></div>`}},
   live(){fillList()}};
 function fillList(){const box=$('#listBody');if(!box)return;
-  if(REAL.on){box.innerHTML=REAL.list.slice().sort((a,b)=>a.label.localeCompare(b.label)).map(t=>`<button class="row" data-a="selReal" data-id="${esc(t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}</small></span><span class="rr">${t.delay!=null&&t.delay>=180?pill('Retraso '+Math.round(t.delay/60)+' min',t.delay>=900?'p-crit':'p-warn'):t.delay!=null?pill('En hora','p-ok'):''}<small>${t.speed!=null?t.speed+' km/h':''}</small></span></button>`).join('');return}
+  if(REAL.on){box.innerHTML=REAL.list.slice().sort((a,b)=>a.label.localeCompare(b.label)).map(t=>`<button class="row" data-a="selReal" data-id="${esc(t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}</small></span><span class="rr">${t.delay!=null&&t.delay>=180?pill('Retraso '+Math.round(t.delay/60)+' min',t.delay>=900?'p-crit':'p-warn'):t.delay!=null?pill('En hora','p-ok'):''}<small>${(t.speed!=null?spd(t):'')}</small></span></button>`).join('');return}
   if(!REAL.tried){box.innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';return}
   box.innerHTML=emptyBox('Sin datos en directo',esc(REAL.err||'El feed de Renfe no devolvió trenes.'),`<button class="btn pri" data-a="retryReal">Reintentar</button>`);return
   /* eslint-disable-next-line no-unreachable */
@@ -886,7 +901,7 @@ function fillDest(){const sel=$('#tvDest');if(!sel)return;const st=CUR[X.selTrai
 
 /* ----- ficha de tren en directo ----- */
 VIEWS.real={render(){const t=REAL.list.find(x=>x.id===X.selReal)||{label:'?',lat:0,lon:0};
-  return{head:headHTML({back:true,title:esc(t.label),sub:'Posición en directo · Renfe',actions:`<button class="ib ${X.favs.trains.some(f=>f.id===t.id)?'on':''}" data-a="favReal" data-id="${esc(t.id)}" aria-label="Favorito">${I.star}</button>`})+`<div class="sum"><div><small>Velocidad</small><b>${t.speed!=null?t.speed+' km/h':'—'}</b></div><div><small>Retraso</small><b>${t.delay==null?'—':Math.round(t.delay/60)+' min'}</b></div><div><small>Estado</small><b>${esc(t.status||'—')}</b></div></div>`,
+  return{head:headHTML({back:true,title:esc(t.label),sub:'Posición en directo · Renfe',actions:`<button class="ib ${X.favs.trains.some(f=>f.id===t.id)?'on':''}" data-a="favReal" data-id="${esc(t.id)}" aria-label="Favorito">${I.star}</button>`})+`<div class="sum"><div><small>Velocidad</small><b>${spd(t)}</b></div><div><small>Retraso</small><b>${t.delay==null?'—':Math.round(t.delay/60)+' min'}</b></div><div><small>Estado</small><b>${esc(t.status||'—')}</b></div></div>`,
   body:`<div class="card"><b>Datos del feed</b><p class="note" style="margin:6px 0 0">Última posición: ${t.time?fmtT(t.time):fmtT(REAL.ts)}${t.stopId?'<br>Parada de referencia: '+esc(t.stopId):''}<br>Coordenadas: ${t.lat.toFixed(4)}°, ${t.lon.toFixed(4)}°${t.tripId?'<br>Viaje: '+esc(t.tripId):''}</p></div><div class="btns"><button class="btn pri" data-a="followReal" data-id="${esc(t.id)}">Seguir este tren</button><button class="btn" data-a="centerReal">Centrar en el mapa</button></div><p class="note">Datos abiertos de Renfe (GTFS-Realtime), actualizados cada 15 s aproximadamente. Pueden tener retraso o huecos.</p>`}}};
 
 /* ----- ficha de estación ----- */
@@ -895,7 +910,7 @@ VIEWS.station={render(){const s=S[X.selStation];
   body:`<h3 class="sec">Trenes a menos de 20 km</h3><div id="depBody"></div><p class="note">Posición de la estación aproximada. Se muestran los trenes en circulación según el feed de Renfe.</p>`}},
   live(){const box=$('#depBody');if(!box)return;const st=S[X.selStation];
     const arr=REAL.list.map(t=>({t,d:hav(st.lon,st.lat,t.lon,t.lat)})).filter(o=>o.d<=20).sort((a,b)=>a.d-b.d).slice(0,12);
-    box.innerHTML=!REAL.on?emptyBox('Sin datos en directo',esc(REAL.err||'Conectando con Renfe…')):arr.length?arr.map(o=>`<button class="row" data-a="selReal" data-id="${esc(o.t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(o.t.label)}</b><small>${esc(o.t.status||'En directo')} · a ${fmtKm(o.d)} km</small></span><span class="rr">${o.t.delay!=null&&o.t.delay>=180?pill('+'+Math.round(o.t.delay/60)+' min',o.t.delay>=900?'p-crit':'p-warn'):''}<small>${o.t.speed!=null?o.t.speed+' km/h':''}</small></span></button>`).join(''):emptyBox('Ningún tren cerca','Ahora mismo no hay trenes a menos de 20 km de esta estación.')}};
+    box.innerHTML=!REAL.on?emptyBox('Sin datos en directo',esc(REAL.err||'Conectando con Renfe…')):arr.length?arr.map(o=>`<button class="row" data-a="selReal" data-id="${esc(o.t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(o.t.label)}</b><small>${esc(o.t.status||'En directo')} · a ${fmtKm(o.d)} km</small></span><span class="rr">${o.t.delay!=null&&o.t.delay>=180?pill('+'+Math.round(o.t.delay/60)+' min',o.t.delay>=900?'p-crit':'p-warn'):''}<small>${(o.t.speed!=null?spd(o.t):'')}</small></span></button>`).join(''):emptyBox('Ningún tren cerca','Ahora mismo no hay trenes a menos de 20 km de esta estación.')}};
 
 /* ----- siguiendo un tren ----- */
 let followKey='';
@@ -906,7 +921,7 @@ VIEWS.follow={render(){const t=REAL.list.find(x=>x.id===X.follow);followKey=t?'1
   live(){if(!X.follow)return;const t=REAL.list.find(x=>x.id===X.follow);if(followKey!==(t?'1':'0')){renderView(true);return}
     const set=(id,v)=>{const e=$('#'+id);if(e&&e.innerHTML!==v)e.innerHTML=v};
     if(!t){set('fGone',`<div class="err">Este tren ya no aparece en el feed de Renfe. Puede haber terminado su servicio.</div>`);return}
-    set('fGone','');set('fSp',t.speed!=null?t.speed+' km/h':'—');set('fDl',t.delay==null?'—':Math.round(t.delay/60)+' min');set('fSt',esc(t.status||'—'));
+    set('fGone','');set('fSp',spd(t));set('fDl',t.delay==null?'—':Math.round(t.delay/60)+' min');set('fSt',esc(t.status||'—'));
     set('fPos',`Actualizado ${t.time?fmtT(t.time):fmtT(REAL.ts)}${t.stopId?'<br>Parada de referencia: '+esc(t.stopId):''}<br>${t.lat.toFixed(4)}°, ${t.lon.toFixed(4)}°`)}};
 
 const stOptions=(sel)=>'<option value="">Elige estación</option>'+[...STL].sort((a,b)=>a.short.localeCompare(b.short,'es')).map(s=>`<option value="${s.id}"${s.id===sel?' selected':''}>${esc(s.name)}</option>`).join('');
