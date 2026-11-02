@@ -6,3 +6,8 @@
   from = "/api/trains"
   to = "/.netlify/functions/trains"
   status = 200
+
+[[redirects]]
+  from = "/api/rails"
+  to = "/.netlify/functions/rails"
+  status = 200

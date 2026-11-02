@@ -1,26 +1,23 @@
-# RailTrack España (con datos en directo)
+# RailTrack España
 
-Mapa ferroviario de España. Si el servidor responde, muestra los trenes reales del feed abierto de Renfe
-(gtfsrt.renfe.com, JSON: Cercanías más Alta Velocidad, Larga y Media Distancia). Si no, usa una demostración simulada, claramente etiquetada.
+Mapa de los trenes de Renfe en directo, con las vías dibujadas con geometría real.
 
-## Publicar en Vercel
-1. Sube esta carpeta a un repositorio de GitHub (o usa `npx vercel` desde esta carpeta).
-2. En vercel.com: Add New > Project > importa el repositorio > Deploy. No hace falta configurar nada.
+## Cómo funciona
+- `/api/trains`: lee los feeds abiertos de Renfe (`gtfsrt.renfe.com`, JSON) y devuelve posición, velocidad y retraso.
+- `/api/rails?x=&y=`: devuelve la geometría real de las vías (OpenStreetMap, vía Overpass) de una celda de 1° x 1°.
+  La app la pide al hacer zoom y la coloca sobre el mapa; los trenes se ajustan a esas vías.
+  Cada celda se cachea una semana en el CDN, así que Overpass apenas recibe peticiones.
+- Sin dependencias externas (Node 18+).
 
-## Publicar en Netlify
-1. Sube la carpeta a GitHub o arrástrala en app.netlify.com/drop (para funciones, mejor repositorio).
-2. Add new site > Import from Git > Deploy. `netlify.toml` ya redirige `/api/trains` a la función.
+## Publicar
+- **Vercel:** Add New > Project > importa el repositorio > Deploy.
+- **Netlify:** Add new site > Import from Git > Deploy (`netlify.toml` ya redirige `/api/*`).
 
-## Comprobar que funciona
-Abre `https://TU-SITIO/api/trains`. Debe devolver un JSON con `trains`.
-- Si da error 502, Renfe habrá cambiado las URLs del feed: define las variables de entorno
-  `RENFE_VP_URLS` (posiciones) y `RENFE_TU_URLS` (retrasos), varias direcciones separadas por coma con las direcciones actuales
-  (están en el portal de datos abiertos de Renfe, buscar «GTFS-Realtime»).
-- En la app, Ajustes > Fuente de datos permite forzar En directo o Demo.
+## Comprobar
+- `https://TU-SITIO/api/trains` debe devolver `trains`.
+- `https://TU-SITIO/api/rails?x=-4&y=40` debe devolver `ways` (zona de Madrid).
+- Si alguna falla, define `RENFE_VP_URLS`, `RENFE_TU_URLS` u `OVERPASS_URL` con direcciones alternativas.
 
-## Qué es real y qué no
-- Real: posición, velocidad, estado y retraso de los trenes que publique el feed.
-- Aún simulado: seguimiento de un viaje concreto, horarios de estación y cruces (solo modo demo).
-- iryo y OUIGO no publican datos abiertos equivalentes, así que no aparecen en modo directo.
-- Sin GPS ni notificaciones nativas en un navegador web: la ubicación es de prueba salvo que
-  el navegador conceda permiso al pulsar «Usar mi ubicación».
+## Créditos y límites
+Datos de Renfe (CC BY 4.0). Vías: © OpenStreetMap contributors (ODbL). Aplicación independiente, sin relación con Renfe.
+iryo y OUIGO no publican datos abiertos, por eso no aparecen. El feed no incluye nombres de paradas.

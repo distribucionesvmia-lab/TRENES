@@ -85,6 +85,12 @@ svg{display:block}
 .tr .hd{pointer-events:none}
 .tr .num{display:none;fill:var(--lbl);font-size:11px;font-weight:700;paint-order:stroke;stroke:var(--halo);stroke-width:3.5px;pointer-events:none}
 #map[data-z="2"] .tr .num{display:block}
+#rails{display:none}
+#map.rails-hi #rails{display:block}
+#map.rails-hi #lines{opacity:.18}
+.rl-cv{fill:none;stroke:var(--cv);stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.95}
+.rl-hs{fill:none;stroke:var(--hs);stroke-width:3;vector-effect:non-scaling-stroke}
+.rl-hs2{fill:none;stroke:var(--land);stroke-width:1.2;stroke-dasharray:7 7;vector-effect:non-scaling-stroke}
 .tr .dl{display:none;stroke:#fff;stroke-width:1.5}
 .tr.late .dl{display:block;fill:var(--lvl2)}
 .tr.vlate .dl{display:block;fill:var(--lvl3)}
@@ -161,6 +167,7 @@ svg{display:block}
 .sum small{display:block;font-size:11.5px;color:var(--text2)}
 .sum b{display:block;font-size:14.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .note{font-size:12.5px;color:var(--text2);line-height:1.45;margin:10px 0}
+.demo-tag.live{color:var(--good);background:var(--good-soft)}
 .demo-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:2px 7px}
 h3.sec{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:18px 0 6px;font-weight:700}
 .row{display:flex;align-items:center;gap:12px;width:100%;padding:11px 2px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
@@ -327,6 +334,7 @@ try{var d=document.documentElement;var t=JSON.parse(localStorage.getItem('railtr
       <g id="geo"></g>
       <g id="seal"></g>
       <g id="lines"></g>
+      <g id="rails"></g>
       <g id="hl"></g>
       <g id="rings"></g>
       <g id="stations"></g>
@@ -340,13 +348,9 @@ try{var d=document.documentElement;var t=JSON.parse(localStorage.getItem('railtr
     <div class="searchrow">
       <label class="search glass" style="border-radius:16px">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="q" type="search" placeholder="Estación, tren o trayecto" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Buscar estación, tren o trayecto">
+        <input id="q" type="search" placeholder="Estación o código de tren" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Buscar estación, tren o trayecto">
         <button id="qclear" class="ib" hidden aria-label="Borrar búsqueda" style="width:28px;height:28px"><svg class="ico" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </label>
-      <button id="btnFilter" class="roundbtn glass" data-a="filterOpen" aria-label="Filtros">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-        <span class="badge" id="fbadge" hidden>0</span>
-      </button>
     </div>
     <div id="results" class="results glass" hidden></div>
     <div class="chips" id="chips"></div>
@@ -356,7 +360,6 @@ try{var d=document.documentElement;var t=JSON.parse(localStorage.getItem('railtr
     <button data-a="zoomIn" aria-label="Acercar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <button data-a="zoomOut" aria-label="Alejar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
     <button data-a="recenter" aria-label="Ver toda España"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg></button>
-    <button id="btnPause" data-a="pause" aria-label="Pausar simulación"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg></button>
   </div>
 
   <div id="banner" class="banner" hidden></div>
@@ -582,36 +585,64 @@ const X={tab:'map',view:'list',snap:'peek',selTrain:null,selStation:null,
   filters:{svcOff:new Set(),opOff:new Set(),station:null,route:null},trip:null,
   settings:{...DEF},favs:{routes:[],trains:[],stations:[]},hist:[],savedTab:'fav',
   form:{a:'',b:'',num:'',time:'',results:null,err:''},
-  nb:{active:false,user:{lon:S.CAL.lon+0.05,lat:S.CAL.lat+0.045,real:false},gpsMsg:'',list:[],level:0,cross:[],nearTrack:null,lastLevel:0},
+  nb:{active:false,user:{lon:S.MAD.lon+0.02,lat:S.MAD.lat+0.02,real:false},gpsMsg:'',list:[],level:0,cross:[],nearTrack:null,lastLevel:0},
   islandOpen:false};
 let storageOK=true;
 try{const raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw){Object.assign(X.settings,raw.settings||{});if(raw.favs)X.favs=Object.assign(X.favs,raw.favs);if(Array.isArray(raw.hist))X.hist=raw.hist}}catch(e){storageOK=false}
-sim.speed=X.settings.speed||120;
+X.settings.island=false;X.settings.source='real';X.favs.trains=(X.favs.trains||[]).filter(f=>f&&typeof f==='object');X.favs.routes=[];X.hist=[];
 function persist(){try{localStorage.setItem(KEY,JSON.stringify({settings:X.settings,favs:X.favs,hist:X.hist.slice(0,40)}))}catch(e){storageOK=false}}
 
 /* ---------- datos en directo (función /api/trains) ---------- */
-const REAL={on:false,list:[],ts:0,err:'',els:{},prevD:{}};
-const showDemo=()=>X.settings.source==='demo'||(!REAL.on&&X.settings.source!=='real');
+const REAL={tried:false,on:false,list:[],ts:0,err:'',els:{},prevD:{}};
+const showDemo=()=>false;
 const nm=o=>o.real?o.name:nm(o);
-function snapNet(x,y,maxKm){let best=null;for(const e of EDGES){const A=S[e.a],B=S[e.b],vx=B.x-A.x,vy=B.y-A.y,t=clamp(((x-A.x)*vx+(y-A.y)*vy)/(vx*vx+vy*vy),0,1),px=A.x+t*vx,py=A.y+t*vy,d=Math.hypot(x-px,y-py)/KMU;if(!best||d<best.d)best={d,px,py,ang:Math.atan2(vy,vx)*180/Math.PI}}return best&&best.d<=maxKm?best:null}
+function tileKey(x,y){return Math.floor(LONf(x))+','+Math.floor(LATf(y))}
+function snapRails(x,y){const tol=3*KMU;let best=null;
+  for(const w of RAILS.ways){const b=w.bb;if(x<b[0]-tol||x>b[2]+tol||y<b[1]-tol||y>b[3]+tol)continue;const P=w.pts;
+    for(let i=0;i<P.length-1;i++){const ax=P[i][0],ay=P[i][1],vx=P[i+1][0]-ax,vy=P[i+1][1]-ay,L=vx*vx+vy*vy;if(!L)continue;
+      const t=clamp(((x-ax)*vx+(y-ay)*vy)/L,0,1),px=ax+t*vx,py=ay+t*vy,d=Math.hypot(x-px,y-py);
+      if(d<=tol&&(!best||d<best.d))best={d,px,py,ang:Math.atan2(vy,vx)*180/Math.PI}}}
+  return best}
+function snapNet(x,y,maxKm){const rt=RAILS.tiles[tileKey(x,y)];if(rt==='ok'){return snapRails(x,y)}
+  let best=null;for(const e of EDGES){const A=S[e.a],B=S[e.b],vx=B.x-A.x,vy=B.y-A.y,t=clamp(((x-A.x)*vx+(y-A.y)*vy)/(vx*vx+vy*vy),0,1),px=A.x+t*vx,py=A.y+t*vy,d=Math.hypot(x-px,y-py)/KMU;if(!best||d<best.d)best={d,px,py,ang:Math.atan2(vy,vx)*180/Math.PI}}return best&&best.d<=maxKm?best:null}
 function realSync(){const seen=new Set();
   for(const t of REAL.list){seen.add(t.id);let e=REAL.els[t.id];
     if(!e){const g=el('g',{class:'tr real','data-real':t.id});
-      g.innerHTML='<g class="hd"><path d="M12 0 7 -4.2 7 4.2Z" fill="#0a74f0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></g><circle class="sel" r="11"/><circle class="body" r="5.6" fill="#0a74f0"/><circle r="15" fill="transparent"/><text class="num" x="10" y="-8"></text>';
+      g.innerHTML='<g class="hd"><path d="M12 0 7 -4.2 7 4.2Z" fill="#0a74f0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></g><circle class="sel" r="11"/><circle class="mine" r="11"/><circle class="body" r="5.6" fill="#0a74f0"/><circle r="15" fill="transparent"/><text class="num" x="10" y="-8"></text>';
       g.lastChild.textContent=t.label;$('#trains').append(g);e=REAL.els[t.id]={g,hd:g.firstChild,x:WXf(t.lon),y:WYf(t.lat),tx:WXf(t.lon),ty:WYf(t.lat),ang:90}}
     const rx=WXf(t.lon),ry=WYf(t.lat);let m=null;if(t.bearing!=null)m=t.bearing-90;else if(e.rx!=null&&Math.hypot(rx-e.rx,ry-e.ry)>0.05)m=Math.atan2(ry-e.ry,rx-e.rx)*180/Math.PI;
-    e.rx=rx;e.ry=ry;const sn=snapNet(rx,ry,25);let nx=rx,ny=ry,a=m;
+    e.rx=rx;e.ry=ry;if(m==null&&e.ang!=null)m=e.ang-90;const sn=snapNet(rx,ry,25);let nx=rx,ny=ry,a=m;
     if(sn){nx=sn.px;ny=sn.py;a=sn.ang;if(m!=null&&Math.cos((m-sn.ang)*Math.PI/180)<0)a+=180}
     if(a!=null)e.ang=a+90;e.tx=nx;e.ty=ny}
   for(const id in REAL.els)if(!seen.has(id)){REAL.els[id].g.remove();delete REAL.els[id]}}
 async function pollReal(){
-  if(X.settings.source==='demo'){REAL.on=false;REAL.err='';REAL.list=[];realSync();renderChips();return}
   try{const r=await fetch('/api/trains',{cache:'no-store'});if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(_){}throw new Error(m)}
     const j=await r.json();if(!j||!Array.isArray(j.trains))throw new Error('Respuesta con formato inesperado');
     REAL.list=j.trains;REAL.ts=Date.now();REAL.on=j.trains.length>0;REAL.err=REAL.on?'':'El feed no devolvió trenes en este momento.'}
-  catch(e){REAL.on=false;REAL.list=[];REAL.err='No se pudo leer el feed en directo ('+(e.message||e)+').'}
-  realSync();renderChips();if(X.view==='list'||X.view==='settings')renderView(true);else if(X.view==='real'&&!REAL.list.find(t=>t.id===X.selReal))deselect()}
+  catch(e){REAL.err='No se pudo leer el feed de Renfe ('+(e.message||e)+').';if(!REAL.list.length)REAL.on=false}
+  REAL.tried=true;realSync();renderChips();
+  if(X.view==='list'||X.view==='follow'||X.view==='saved')renderView(true);else if(X.view==='real'&&!REAL.list.find(t=>t.id===X.selReal))deselect()}
 function selectReal(id){X.selReal=id;X.selTrain=null;X.selStation=null;markSel();X.tab='map';setTabUI();setView('real');drawHL();const e=REAL.els[id];if(e)flyTo(e.tx,e.ty,3,'half')}
+
+/* ---------- vías reales por celdas (función /api/rails) ---------- */
+const RAILS={tiles:{},ways:[],ok:0};let railTimer=0;
+function scheduleRails(){clearTimeout(railTimer);railTimer=setTimeout(loadRails,350)}
+async function loadRails(){if(view.k/view.k0<2.2)return;const W=app.clientWidth,H=app.clientHeight;
+  const lon0=LONf((0-view.x)/view.k),lon1=LONf((W-view.x)/view.k),lat1=LATf((0-view.y)/view.k),lat0=LATf((H-view.y)/view.k);
+  const cx=LONf((W/2-view.x)/view.k),cy=LATf((H/2-view.y)/view.k),need=[];
+  for(let tx=Math.floor(lon0);tx<=Math.floor(lon1);tx++)for(let ty=Math.floor(lat0);ty<=Math.floor(lat1);ty++){
+    if(tx<-10||tx>4||ty<35||ty>43)continue;const k=tx+','+ty,st=RAILS.tiles[k];
+    if(st==='ok'||st==='loading'||(typeof st==='number'&&Date.now()-st<60000))continue;need.push({tx,ty,k,d:Math.hypot(tx+.5-cx,ty+.5-cy)})}
+  need.sort((a,b)=>a.d-b.d);
+  await Promise.all(need.slice(0,8).map(async n=>{RAILS.tiles[n.k]='loading';
+    try{const r=await fetch('/api/rails?x='+n.tx+'&y='+n.ty);if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();if(!Array.isArray(j.ways))throw new Error('formato');
+      const hs=[],cv=[];for(const w of j.ways){const pts=w.p.map(q=>[WXf(q[0]),WYf(q[1])]);if(pts.length<2)continue;
+        let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const q of pts){x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1])}
+        RAILS.ways.push({bb:[x0,y0,x1,y1],pts});(w.h?hs:cv).push('M'+pts.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L'))}
+      const g=$('#rails');g.append(el('path',{d:cv.join(''),class:'rl-cv'}),el('path',{d:hs.join(''),class:'rl-hs'}),el('path',{d:hs.join(''),class:'rl-hs2'}));
+      RAILS.tiles[n.k]='ok';RAILS.ok++}
+    catch(e){RAILS.tiles[n.k]=Date.now()}}));
+  applyView();realSync()}
 
 /* ---------- tema ---------- */
 const root=document.documentElement;
@@ -667,6 +698,7 @@ let lastZ=-1;
 function applyView(){
   world.setAttribute('transform',`translate(${view.x.toFixed(2)} ${view.y.toFixed(2)}) scale(${view.k.toFixed(4)})`);
   const z=view.k/view.k0,zl=z<1.6?0:(z<3.4?1:2);if(zl!==lastZ){lastZ=zl;svg.dataset.z=zl}
+  svg.classList.toggle('rails-hi',z>=2.2&&RAILS.ok>0);scheduleRails();
   const inv=1/view.k;
   for(const id in stEls){const s=stEls[id].s;stEls[id].g.setAttribute('transform',`translate(${s.x.toFixed(1)} ${s.y.toFixed(1)}) scale(${inv.toFixed(4)})`)}
   const um=userEl();if(um){const u=X.nb.user;um.setAttribute('transform',`translate(${WXf(u.lon).toFixed(1)} ${WYf(u.lat).toFixed(1)}) scale(${inv.toFixed(4)})`)}
@@ -720,13 +752,9 @@ function passes(tr){const f=X.filters;if(f.svcOff.has(tr.svc)||f.opOff.has(tr.op
   if(f.station&&!tr.stops.has(f.station))return false;if(f.route&&!(tr.stops.has(f.route.a)&&tr.stops.has(f.route.b)))return false;return true}
 const visibleTrains=()=>TRAINS.filter(passes);
 const activeFilters=()=>X.filters.svcOff.size+X.filters.opOff.size+(X.filters.station?1:0)+(X.filters.route?1:0);
-function renderChips(){const f=X.filters;let h=`<button class="chip clock" data-a="tab" data-t="settings" title="Reloj y velocidad de la demostración"><span id="clk">--:--</span><span id="clkx"> · ×${sim.speed}</span></button>`;
-  if(f.route)h+=`<button class="chip act" data-a="clearRoute">${esc(S[f.route.a].short)} ⇄ ${esc(S[f.route.b].short)} ✕</button>`;
-  if(f.station)h+=`<button class="chip act" data-a="clearStation">Estación: ${esc(S[f.station].short)} ✕</button>`;
-  for(const k in SVC){const s=SVC[k],off=f.svcOff.has(k);h+=`<button class="chip ${off?'off':'on'}" style="--c:${s.c}" data-a="chipSvc" data-s="${k}" aria-pressed="${!off}"><i></i>${esc(s.n)}</button>`}
-  $('#chips').innerHTML=h;const n=activeFilters(),b=$('#fbadge');b.hidden=!n;b.textContent=n;updateClock()}
-function updateClock(){const c=$('#clk');if(c)c.textContent=REAL.on?'En directo '+fmtT(REAL.ts):'Demo '+fmtT(sim.t);const x=$('#clkx');if(x)x.textContent=REAL.on?'':(sim.paused?' · en pausa':' · ×'+sim.speed);
-  $$('[data-demotag]').forEach(t=>{const tx=REAL.on?'En directo':'Datos simulados';if(t.textContent!==tx){t.textContent=tx;t.style.color=REAL.on?'var(--good)':'';t.style.background=REAL.on?'var(--good-soft)':''}})}
+function renderChips(){$('#chips').innerHTML='<span class="chip clock"><i style="background:var(--good)"></i><span id="clk"></span></span>';updateClock()}
+function updateClock(){const c=$('#clk');if(c){const t=REAL.on?'En directo · '+REAL.list.length+' trenes · '+fmtT(REAL.ts)+(REAL.err?' · sin conexión':''):(REAL.tried?'Sin datos de Renfe':'Conectando con Renfe…');if(c.textContent!==t)c.textContent=t}
+  $$('[data-demotag]').forEach(t=>{const tx=REAL.on?'En directo':'Sin datos';if(t.textContent!==tx){t.textContent=tx;t.style.color=REAL.on?'':'var(--warn)';t.style.background=REAL.on?'':'var(--warn-soft)'}})}
 
 /* ---------- selección ---------- */
 function selectTrain(id){X.selTrain=id;X.selStation=null;markSel();X.tab='map';setTabUI();setView('train');drawHL();
@@ -734,7 +762,7 @@ function selectTrain(id){X.selTrain=id;X.selStation=null;markSel();X.tab='map';s
 function selectStation(id,fly=true){X.selStation=id;X.selTrain=null;markSel();X.tab='map';setTabUI();setView('station');drawHL();
   if(fly)flyTo(S[id].x,S[id].y,3,'half');else{}}
 function deselect(){X.selReal=null;X.selTrain=null;X.selStation=null;markSel();drawHL();X.tab='map';setTabUI();setView('list')}
-function markSel(){for(const id in REAL.els)REAL.els[id].g.classList.toggle('sel',id===X.selReal);for(const id in trEls)trEls[id].g.classList.toggle('sel',id===X.selTrain);
+function markSel(){for(const id in REAL.els){REAL.els[id].g.classList.toggle('sel',id===X.selReal);REAL.els[id].g.classList.toggle('mine',id===X.follow)}for(const id in trEls)trEls[id].g.classList.toggle('sel',id===X.selTrain);
   for(const id in stEls){stEls[id].g.classList.toggle('sel',id===X.selStation);stEls[id].g.classList.toggle('flt',id===X.filters.station)}}
 
 /* ---------- resaltado de rutas ---------- */
@@ -757,7 +785,7 @@ function updateHLDone(){if(!X.trip||!hlDone)return;const lv=tripLive(X.trip,sim.
 /* ---------- bucle de animación ---------- */
 const CUR={};
 function frame(){try{tickSim();
-  for(const tr of TRAINS){const st=trainState(tr,sim.t);CUR[tr.id]=st;const te=trEls[tr.id];
+  for(const tr of []){const st=trainState(tr,sim.t);CUR[tr.id]=st;const te=trEls[tr.id];
     const vis=passes(tr)&&showDemo();te.g.style.display=vis?'':'none';if(!vis)continue;
     te.g.setAttribute('transform',`translate(${st.x.toFixed(2)} ${st.y.toFixed(2)}) scale(${(1/view.k).toFixed(4)})`);
     te.hd.setAttribute('transform',`rotate(${st.ang.toFixed(1)})`);
@@ -774,13 +802,13 @@ function search(q){const nq=norm(q);if(!nq){closeResults();return}
   const found=[];STL.forEach(s=>{let best=-1;[s.short,s.name].forEach(n=>{const i=nq.indexOf(norm(n));if(i>=0&&(best<0||i<best))best=i});if(best>=0)found.push({s,i:best})});
   found.sort((a,b)=>a.i-b.i);
   const sts=STL.filter(s=>norm(s.name).includes(nq)||norm(s.short).includes(nq)).slice(0,5);
-  const trs=TRAINS.filter(t=>t.num.includes(nq)||norm(SVC[t.svc].n).includes(nq)||norm(t.op).includes(nq)||norm(S[t.first].short).includes(nq)||norm(S[t.last].short).includes(nq)).slice(0,6);
+  const trs=REAL.list.filter(t=>norm(t.label).includes(nq)).slice(0,6);
   let h='';
-  if(found.length>=2){const a=found[0].s,b=found[1].s,n=TRAINS.filter(t=>t.stops.has(a.id)&&t.stops.has(b.id)).length;
+  if(false){const a=found[0].s,b=found[1].s,n=TRAINS.filter(t=>t.stops.has(a.id)&&t.stops.has(b.id)).length;
     h+=`<h4>Trayecto</h4><button class="res" data-a="routeFilter" data-x="${a.id}" data-y="${b.id}"><span class="ri">${I.route}</span><span><b>${esc(a.short)} ⇄ ${esc(b.short)}</b><small>${n?n+' trenes simulados cubren este trayecto':'Ningún tren simulado cubre este trayecto'}</small></span></button>`}
   if(sts.length)h+=`<h4>Estaciones</h4>`+sts.map(s=>`<button class="res" data-a="selStation" data-id="${s.id}"><span class="ri">${I.pin}</span><span><b>${esc(s.name)}</b><small>Estación${s.major?' principal':''}</small></span></button>`).join('');
-  if(trs.length)h+=`<h4>Trenes</h4>`+trs.map(t=>`<button class="res" data-a="selTrain" data-id="${t.id}"><span class="ri" style="background:${t.c};color:#fff">${I.train}</span><span><b>${esc(trainName(t))}</b><small>${esc(S[t.first].short)} ⇄ ${esc(S[t.last].short)} · ${esc(t.op)}</small></span></button>`).join('');
-  if(!h)h=`<div class="empty"><b>Sin resultados para «${esc(q)}»</b><br>Prueba con el nombre de una estación («Sevilla»), un número de tren («9012») o un trayecto («Madrid Barcelona»).</div>`;
+  if(trs.length)h+=`<h4>Trenes en directo</h4>`+trs.map(t=>`<button class="res" data-a="selReal" data-id="${esc(t.id)}"><span class="ri" style="background:var(--accent);color:#fff">${I.train}</span><span><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}${t.speed!=null?' · '+t.speed+' km/h':''}</small></span></button>`).join('');
+  if(!h)h=`<div class="empty"><b>Sin resultados para «${esc(q)}»</b><br>Prueba con el nombre de una estación («Sevilla») o el código de un tren en circulación.</div>`;
   resEl.innerHTML=h;resEl.hidden=false}
 qEl.addEventListener('input',()=>{$('#qclear').hidden=!qEl.value;search(qEl.value)});
 qEl.addEventListener('focus',()=>{if(qEl.value)search(qEl.value)});
@@ -788,7 +816,7 @@ $('#qclear').addEventListener('click',()=>{qEl.value='';$('#qclear').hidden=true
 
 /* ---------- hoja inferior ---------- */
 const SNAPS=['peek','half','full'];
-const DEFSNAP={real:'half',list:'peek',train:'half',station:'half',tripSetup:'half',trip:'half',nearby:'half',saved:'half',settings:'half'};
+const DEFSNAP={follow:'half',real:'half',list:'peek',train:'half',station:'half',tripSetup:'half',trip:'half',nearby:'half',saved:'half',settings:'half'};
 function setSnap(s){X.snap=s;sheet.dataset.snap=s}
 let gy=null,gdy=0;
 $('#grab').addEventListener('pointerdown',e=>{gy=e.clientY;gdy=0;$('#grab').setPointerCapture(e.pointerId)});
@@ -800,7 +828,7 @@ const sb=svc=>`<span class="sb" style="--c:${SVC[svc].c}">${esc(SVC[svc].n)}</sp
 const pill=(txt,cls)=>`<span class="pill ${cls}">${esc(txt)}</span>`;
 const isFavTrain=id=>X.favs.trains.includes(id),isFavSt=id=>X.favs.stations.includes(id),isFavRoute=(a,b)=>X.favs.routes.some(r=>r.a===a&&r.b===b);
 const emptyBox=(t,d,btn='')=>`<div class="empty"><b>${t}</b><br>${d}${btn?`<div class="btns" style="justify-content:center">${btn}</div>`:''}</div>`;
-const DEMOTAG='<span class="demo-tag" data-demotag>Datos simulados</span>';
+const DEMOTAG='<span class="demo-tag live" data-demotag>En directo</span>';
 
 const VIEWS={};
 function setView(v,opts={}){X.view=v;setSnap(opts.snap||DEFSNAP[v]);renderView(opts.keepScroll)}
@@ -809,12 +837,14 @@ function renderView(keep){const top=keep?sbody.scrollTop:0;const r=VIEWS[X.view]
 
 /* ----- lista de trenes ----- */
 VIEWS.list={render(){const n=REAL.on?REAL.list.length:visibleTrains().length;
-  return{head:headHTML({title:'Trenes en circulación',sub:REAL.on?`${n} trenes · ${DEMOTAG}`:`${n} de ${TRAINS.length} · ${DEMOTAG}`,actions:`<button class="ib" data-a="filterOpen" aria-label="Filtros">${I.route}</button>`}),
-  body:`<div class="legend"><span><i></i>Alta velocidad</span><span><i class="cv"></i>Red convencional</span><span><svg width="14" height="14" viewBox="-8 -8 16 16"><circle r="3.4" cx="5" cy="-4" fill="var(--lvl2)"/></svg>Retraso</span></div><div id="listBody"></div>`}},
+  return{head:headHTML({title:'Trenes en circulación',sub:`${n} trenes · ${DEMOTAG}`,actions:''}),
+  body:`<div id="listBody"></div>`}},
   live(){fillList()}};
 function fillList(){const box=$('#listBody');if(!box)return;
   if(REAL.on){box.innerHTML=REAL.list.slice().sort((a,b)=>a.label.localeCompare(b.label)).map(t=>`<button class="row" data-a="selReal" data-id="${esc(t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(t.label)}</b><small>${esc(t.status||'En directo')}</small></span><span class="rr">${t.delay!=null&&t.delay>=180?pill('Retraso '+Math.round(t.delay/60)+' min',t.delay>=900?'p-crit':'p-warn'):t.delay!=null?pill('En hora','p-ok'):''}<small>${t.speed!=null?t.speed+' km/h':''}</small></span></button>`).join('');return}
-  if(X.settings.source==='real'||(REAL.err&&X.settings.source==='real')){box.innerHTML=emptyBox('Sin datos en directo',esc(REAL.err||'Esperando al feed…'),`<button class="btn pri" data-a="retryReal">Reintentar</button>`);return}
+  if(!REAL.tried){box.innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';return}
+  box.innerHTML=emptyBox('Sin datos en directo',esc(REAL.err||'El feed de Renfe no devolvió trenes.'),`<button class="btn pri" data-a="retryReal">Reintentar</button>`);return
+  /* eslint-disable-next-line no-unreachable */
   const arr=visibleTrains();
   if(!arr.length){box.innerHTML=emptyBox('Ningún tren coincide con los filtros','Activa más servicios u operadores para ver trenes en el mapa.',`<button class="btn pri" data-a="clearFilters">Quitar filtros</button>`);return}
   arr.sort((a,b)=>a.svc===b.svc?a.num-b.num:Object.keys(SVC).indexOf(a.svc)-Object.keys(SVC).indexOf(b.svc));
@@ -856,76 +886,30 @@ function fillDest(){const sel=$('#tvDest');if(!sel)return;const st=CUR[X.selTrai
 
 /* ----- ficha de tren en directo ----- */
 VIEWS.real={render(){const t=REAL.list.find(x=>x.id===X.selReal)||{label:'?',lat:0,lon:0};
-  return{head:headHTML({back:true,title:esc(t.label),sub:'Posición en directo · Renfe'})+`<div class="sum"><div><small>Velocidad</small><b>${t.speed!=null?t.speed+' km/h':'—'}</b></div><div><small>Retraso</small><b>${t.delay==null?'—':Math.round(t.delay/60)+' min'}</b></div><div><small>Estado</small><b>${esc(t.status||'—')}</b></div></div>`,
-  body:`<div class="card"><b>Datos del feed</b><p class="note" style="margin:6px 0 0">Última posición: ${t.time?fmtT(t.time):fmtT(REAL.ts)}${t.stopId?'<br>Parada de referencia: '+esc(t.stopId):''}<br>Coordenadas: ${t.lat.toFixed(4)}°, ${t.lon.toFixed(4)}°${t.tripId?'<br>Viaje: '+esc(t.tripId):''}</p></div><div class="btns"><button class="btn" data-a="centerReal">Centrar en el mapa</button></div><p class="note">Datos abiertos de Renfe (GTFS-Realtime), actualizados cada 15 s aproximadamente. Pueden tener retraso o huecos.</p>`}}};
+  return{head:headHTML({back:true,title:esc(t.label),sub:'Posición en directo · Renfe',actions:`<button class="ib ${X.favs.trains.some(f=>f.id===t.id)?'on':''}" data-a="favReal" data-id="${esc(t.id)}" aria-label="Favorito">${I.star}</button>`})+`<div class="sum"><div><small>Velocidad</small><b>${t.speed!=null?t.speed+' km/h':'—'}</b></div><div><small>Retraso</small><b>${t.delay==null?'—':Math.round(t.delay/60)+' min'}</b></div><div><small>Estado</small><b>${esc(t.status||'—')}</b></div></div>`,
+  body:`<div class="card"><b>Datos del feed</b><p class="note" style="margin:6px 0 0">Última posición: ${t.time?fmtT(t.time):fmtT(REAL.ts)}${t.stopId?'<br>Parada de referencia: '+esc(t.stopId):''}<br>Coordenadas: ${t.lat.toFixed(4)}°, ${t.lon.toFixed(4)}°${t.tripId?'<br>Viaje: '+esc(t.tripId):''}</p></div><div class="btns"><button class="btn pri" data-a="followReal" data-id="${esc(t.id)}">Seguir este tren</button><button class="btn" data-a="centerReal">Centrar en el mapa</button></div><p class="note">Datos abiertos de Renfe (GTFS-Realtime), actualizados cada 15 s aproximadamente. Pueden tener retraso o huecos.</p>`}}};
 
 /* ----- ficha de estación ----- */
 VIEWS.station={render(){const s=S[X.selStation];
-  return{head:headHTML({back:true,title:esc(s.name),sub:`Estación · horarios simulados`,actions:`<button class="ib ${isFavSt(s.id)?'on':''}" data-a="favStation" data-id="${s.id}" aria-label="Favorita">${I.star}</button>`}),
-  body:`<div class="btns"><button class="btn pri sm" data-a="tripFrom" data-id="${s.id}">Viajar desde aquí</button><button class="btn sm" data-a="stFilter" data-id="${s.id}">Filtrar trenes aquí</button></div>
-  <h3 class="sec">Próximas salidas</h3><div id="depBody"></div><p class="note">Horario simulado. No existe una fuente pública fiable conectada a esta demostración.</p>`}},
-  live(){const box=$('#depBody');if(!box)return;const d=departures(X.selStation,sim.t,8);
-    box.innerHTML=d.length?d.map(o=>`<button class="row" data-a="selTrain" data-id="${o.tr.id}"><b style="width:52px;font-variant-numeric:tabular-nums;font-size:17px">${fmtT(o.actual)}</b><span class="rm"><b style="font-size:14.5px">${esc(S[o.dest].short)}</b><small>${esc(nm(o))}${o.tr.delay>=180?' · prev. '+fmtT(o.sched):''}</small></span><span class="rr">${sb(o.tr.svc)}${o.tr.delay>=180?pill('+'+Math.round(o.tr.delay/60)+' min',o.tr.delay>=900?'p-crit':'p-warn'):pill('En hora','p-ok')}</span></button>`).join(''):emptyBox('Sin salidas próximas','Ningún tren simulado sale de esta estación.')}};
+  return{head:headHTML({back:true,title:esc(s.name),sub:'Estación · '+DEMOTAG,actions:`<button class="ib ${isFavSt(s.id)?'on':''}" data-a="favStation" data-id="${s.id}" aria-label="Favorita">${I.star}</button>`}),
+  body:`<h3 class="sec">Trenes a menos de 20 km</h3><div id="depBody"></div><p class="note">Posición de la estación aproximada. Se muestran los trenes en circulación según el feed de Renfe.</p>`}},
+  live(){const box=$('#depBody');if(!box)return;const st=S[X.selStation];
+    const arr=REAL.list.map(t=>({t,d:hav(st.lon,st.lat,t.lon,t.lat)})).filter(o=>o.d<=20).sort((a,b)=>a.d-b.d).slice(0,12);
+    box.innerHTML=!REAL.on?emptyBox('Sin datos en directo',esc(REAL.err||'Conectando con Renfe…')):arr.length?arr.map(o=>`<button class="row" data-a="selReal" data-id="${esc(o.t.id)}"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(o.t.label)}</b><small>${esc(o.t.status||'En directo')} · a ${fmtKm(o.d)} km</small></span><span class="rr">${o.t.delay!=null&&o.t.delay>=180?pill('+'+Math.round(o.t.delay/60)+' min',o.t.delay>=900?'p-crit':'p-warn'):''}<small>${o.t.speed!=null?o.t.speed+' km/h':''}</small></span></button>`).join(''):emptyBox('Ningún tren cerca','Ahora mismo no hay trenes a menos de 20 km de esta estación.')}};
 
-/* ----- configurar viaje ----- */
+/* ----- siguiendo un tren ----- */
+let followKey='';
+VIEWS.follow={render(){const t=REAL.list.find(x=>x.id===X.follow);followKey=t?'1':'0';
+  if(!X.follow)return{head:headHTML({title:'Siguiendo',sub:'Tu tren en directo'}),body:emptyBox('No sigues ningún tren','Toca un tren en el mapa y pulsa «Seguir este tren».',`<button class="btn pri" data-a="tab" data-t="map">Ir al mapa</button>`)};
+  return{head:headHTML({title:esc(t?t.label:'Tren'),sub:'Siguiendo · '+DEMOTAG,actions:`<button class="ib" data-a="unfollow" aria-label="Dejar de seguir">${I.close}</button>`})+`<div class="sum"><div><small>Velocidad</small><b id="fSp">—</b></div><div><small>Retraso</small><b id="fDl">—</b></div><div><small>Estado</small><b id="fSt">—</b></div></div>`,
+  body:`<div id="fGone"></div><div class="card"><b>Última posición</b><p class="note" style="margin:6px 0 0" id="fPos"></p></div><div class="btns"><button class="btn pri" data-a="centerFollow">Centrar en el mapa</button><button class="btn" data-a="unfollow">Dejar de seguir</button></div><p class="note">Datos abiertos de Renfe, actualizados cada pocos segundos. El feed no incluye el nombre de las paradas.</p>`}},
+  live(){if(!X.follow)return;const t=REAL.list.find(x=>x.id===X.follow);if(followKey!==(t?'1':'0')){renderView(true);return}
+    const set=(id,v)=>{const e=$('#'+id);if(e&&e.innerHTML!==v)e.innerHTML=v};
+    if(!t){set('fGone',`<div class="err">Este tren ya no aparece en el feed de Renfe. Puede haber terminado su servicio.</div>`);return}
+    set('fGone','');set('fSp',t.speed!=null?t.speed+' km/h':'—');set('fDl',t.delay==null?'—':Math.round(t.delay/60)+' min');set('fSt',esc(t.status||'—'));
+    set('fPos',`Actualizado ${t.time?fmtT(t.time):fmtT(REAL.ts)}${t.stopId?'<br>Parada de referencia: '+esc(t.stopId):''}<br>${t.lat.toFixed(4)}°, ${t.lon.toFixed(4)}°`)}};
+
 const stOptions=(sel)=>'<option value="">Elige estación</option>'+[...STL].sort((a,b)=>a.short.localeCompare(b.short,'es')).map(s=>`<option value="${s.id}"${s.id===sel?' selected':''}>${esc(s.name)}</option>`).join('');
-VIEWS.tripSetup={render(){const f=X.form;if(!f.time)f.time=fmtT(sim.t);
-  const favs=X.favs.routes.map((r,i)=>`<button class="chip" data-a="useFavRoute" data-i="${i}">${esc(S[r.a].short)} → ${esc(S[r.b].short)}</button>`).join('');
-  return{head:headHTML({title:'Voy en un tren',sub:`Sigue tu trayecto · ${DEMOTAG}`,actions:`<button class="ib" data-a="importOpen" aria-label="Importar billete">${I.upload}</button>`}),
-  body:`${favs?`<div class="chipset" aria-label="Trayectos favoritos">${favs}</div>`:''}
-  <div class="two"><label class="field"><span>Origen</span><select id="fA">${stOptions(f.a)}</select></label><button class="ib swap" data-a="swapAB" aria-label="Intercambiar origen y destino">${I.swap}</button><label class="field"><span>Destino</span><select id="fB">${stOptions(f.b)}</select></label></div>
-  <div class="grid2"><label class="field"><span>Número de tren (opcional)</span><input id="fNum" inputmode="numeric" placeholder="Ej. 9012" value="${esc(f.num)}" maxlength="6"></label><label class="field"><span>Hora (demo)</span><input id="fTime" type="time" value="${esc(f.time)}"></label></div>
-  <div class="err" id="fErr" role="alert">${esc(f.err)}</div>
-  <div class="btns"><button class="btn pri" data-a="searchTrips">Buscar trenes</button><button class="btn" data-a="importOpen">Importar billete</button></div>
-  <div id="tripRes"></div>
-  <p class="note">La hora usa el reloj de la demo (${fmtT(sim.t)}). Los trenes y horarios mostrados son simulados.</p>`}},
-  after(){fillTripRes()}};
-function fillTripRes(){const box=$('#tripRes');if(!box)return;const r=X.form.results;if(!r){box.innerHTML='';return}
-  if(r==='loading'){box.innerHTML='<div class="skel"></div><div class="skel"></div>';return}
-  if(!r.length){box.innerHTML=emptyBox('No hay trenes simulados para ese trayecto','Prueba con otro origen o destino, o cambia la hora. Pista: Madrid → Barcelona siempre tiene servicio.');return}
-  box.innerHTML='<h3 class="sec">Trenes disponibles</h3>'+r.map((o,i)=>`<div class="row"><span class="rm"><b>${fmtT(o.depA)} → ${fmtT(o.arrA)} <span style="font-weight:500;color:var(--text2);font-size:13px">· ${fmtDur((o.arr-o.dep)/1000)}</span></b><small>${sb(o.tr.svc)} ${esc(o.tr.num)} ${o.tr.delay>=180?pill('+'+Math.round(o.tr.delay/60)+' min','p-warn'):''}</small></span><button class="btn pri sm" data-a="startOpt" data-i="${i}">Seguir</button></div>`).join('')}
-function readForm(){const f=X.form;const a=$('#fA'),b=$('#fB'),n=$('#fNum'),t=$('#fTime');if(a)f.a=a.value;if(b)f.b=b.value;if(n)f.num=n.value.trim();if(t)f.time=t.value}
-function runSearch(){readForm();const f=X.form;f.err='';const err=m=>{f.err=m;$('#fErr').textContent=m;f.results=null;fillTripRes()};
-  if(f.num){const tr=TR[f.num];if(!tr)return err('No existe el tren «'+f.num+'» en la demostración. Los números simulados van del 9001 al '+(9000+TRAINS.length)+'.');
-    if(!f.a&&!f.b){f.a=tr.first;f.b=tr.last;$('#fA').value=f.a;$('#fB').value=f.b}}
-  if(!f.a||!f.b)return err('Elige origen y destino.');
-  if(f.a===f.b)return err('El origen y el destino no pueden ser la misma estación.');
-  let from=sim.t;if(f.time){const[h,m]=f.time.split(':').map(Number);const d=new Date(sim.t);d.setHours(h,m,0,0);if(d.getTime()>from)from=d.getTime()}
-  f.results='loading';fillTripRes();$('#fErr').textContent='';
-  setTimeout(()=>{if(X.view!=='tripSetup')return;let o=tripOptions(f.a,f.b,from);if(f.num)o=o.filter(x=>x.tr.num===f.num);
-    if(f.num&&!o.length){f.results=null;return err('El tren '+f.num+' no hace el trayecto '+S[f.a].short+' → '+S[f.b].short+' en ese sentido. Prueba a intercambiar origen y destino.')}
-    f.results=o;fillTripRes()},350)}
-
-/* ----- viaje en curso ----- */
-VIEWS.trip={render(){const t=X.trip,tr=TR[t.trainId];
-  return{head:headHTML({title:`${esc(trainName(tr))}`,sub:`${esc(S[t.a].short)} → ${esc(S[t.b].short)} · simulado`,actions:`<button class="ib ${isFavRoute(t.a,t.b)?'on':''}" data-a="favRoute" aria-label="Guardar trayecto">${I.star}</button><button class="ib" data-a="liveOpen" aria-label="Ver Live Activity simulada">${I.phone}</button>`})+
-    `<div class="lvlbar" id="tpBanner" style="display:flex;justify-content:space-between"><span><span class="pct" id="tpPct">0%</span></span><span id="tpState" style="text-align:right;font-size:13.5px"></span></div><div class="bar" style="margin-top:8px"><i id="tpBar"></i></div>`,
-  body:`<div class="sum"><div><small>Próxima parada</small><b id="tpNext">—</b></div><div><small>Llegada</small><b id="tpEta">—</b></div><div><small>Quedan</small><b id="tpRem">—</b></div></div>
-  <div class="grid2" style="margin-top:8px"><div class="stat"><small>Tiempo transcurrido</small><b id="tpEl">—</b></div><div class="stat"><small>Velocidad</small><b id="tpSp">—</b></div></div>
-  <h3 class="sec">Cronología</h3><ul class="tl" id="tpTl"></ul>
-  <h3 class="sec">Conexiones en destino</h3><div id="tpConn"></div>
-  <div class="btns"><button class="btn" data-a="tripCenter">Ver en el mapa</button><button class="btn" data-a="liveOpen">Live Activity (simulada)</button><button class="btn dan" data-a="endTrip" id="btnEnd">Finalizar viaje</button></div>
-  <p class="note">Los tiempos usan la hora demo (×${sim.speed}). Las conexiones son trenes simulados que salen del destino.</p>`}},
-  after(){const t=X.trip,lv=tripLive(t,sim.t);$('#tpTl').innerHTML=lv.stops.map(k=>`<li data-k="${k}"><div class="tn"><b>${esc(S[lv.leg.ids[k]].short)}</b><small>${k===lv.ia?'Origen':k===lv.ib?'Destino':'Parada'}</small></div><div class="tt" id="tpt${k}"></div></li>`).join('');connKey='';},
-  live(){const t=X.trip;if(!t)return;const lv=tripLive(t,sim.t),tr=lv.tr;const set=(id,v)=>{const e=$('#'+id);if(e&&e.textContent!==v)e.textContent=v};
-    set('tpPct',Math.round(lv.prog*100)+'%');$('#tpBar').style.width=(lv.prog*100)+'%';
-    const st=CUR[tr.id];set('tpSp',st?Math.round(st.speed)+' km/h':'—');
-    let state='';if(lv.phase==='before')state='Sale en '+fmtDur(lv.until);else if(lv.phase==='run')state=tr.delay>=180?'Retraso +'+Math.round(tr.delay/60)+' min':'En hora';else state='Has llegado';
-    set('tpState',state);set('tpNext',lv.phase==='done'?'Destino':S[lv.leg.ids[lv.next]].short);set('tpEta',fmtT(lv.etaMs));
-    set('tpRem',lv.phase==='before'?fmtDur(lv.total):fmtDur(lv.remaining));set('tpEl',fmtDur(lv.elapsed));
-    const btn=$('#btnEnd');if(btn){const lab=lv.phase==='done'?'Cerrar y guardar':'Finalizar viaje';if(btn.textContent!==lab)btn.textContent=lab}
-    lv.stops.forEach(k=>{const li=$('#tpTl [data-k="'+k+'"]');if(!li)return;const dep=k===lv.ia?lv.leg.dep[k]:lv.leg.arr[k];const sched=evAbs(tr,t.c,t.dir,dep);
-      const h=fmtT(sched+tr.delay*1000)+(tr.delay>=180?`<small>prev. ${fmtT(sched)}</small>`:'');const tt=$('#tpt'+k);if(tt.innerHTML!==h)tt.innerHTML=h;
-      let cls='';const leftTime=k===lv.ib?lv.leg.arr[k]:lv.leg.dep[k];
-      if(lv.ul>=leftTime&&!(k===lv.ib&&lv.phase!=='done'))cls='past';else if(lv.phase==='run'&&k===lv.next)cls='next';
-      if(lv.phase==='run'&&lv.ul>=lv.leg.arr[k]&&lv.ul<lv.leg.dep[k])cls='cur';
-      if(lv.phase==='done'&&k===lv.ib)cls='cur';if(li.className!==cls)li.className=cls});
-    const ck=lv.phase==='done'?'d':Math.floor(sim.t/20000);if(ck!==connKey){connKey=ck;fillConn(lv)}
-    updateHLDone()}};
-let connKey='';
-function fillConn(lv){const box=$('#tpConn');if(!box)return;const t=X.trip;const d=departures(t.b,lv.etaMs+4*60000,10).filter(o=>o.tr.id!==t.trainId&&o.actual-lv.etaMs<150*60000).slice(0,4);
-  box.innerHTML=d.length?d.map(o=>`<div class="row"><b style="width:52px;font-variant-numeric:tabular-nums;font-size:17px">${fmtT(o.actual)}</b><span class="rm"><b style="font-size:14.5px">${esc(S[o.dest].short)}</b><small>${esc(nm(o))} · espera ${fmtDur((o.actual-lv.etaMs)/1000)}</small></span>${sb(o.tr.svc)}</div>`).join(''):`<div class="empty" style="padding:10px 0;text-align:left">Sin conexiones simuladas en las 2 h siguientes a tu llegada.</div>`}
-
 /* ----- trenes cercanos ----- */
 const CARD=['N','NE','E','SE','S','SO','O','NO'];
 const lvlTxt=['Sin aviso','Aviso amarillo','Aviso naranja','Aviso rojo'];
@@ -934,7 +918,7 @@ function nearbyCalc(force){const nb=X.nb;if(!nb.active){nb.level=0;nb.list=[];nb
   if(REAL.on){for(const t of REAL.list){const d=hav(u.lon,u.lat,t.lon,t.lat);const pd=REAL.prevD[t.id];REAL.prevD[t.id]=d;
       const p=Math.PI/180,dl=(t.lon-u.lon)*p,y=Math.sin(dl)*Math.cos(t.lat*p),x=Math.cos(u.lat*p)*Math.sin(t.lat*p)-Math.sin(u.lat*p)*Math.cos(t.lat*p)*Math.cos(dl);
       const brg=(Math.atan2(y,x)/p+360)%360;list.push({real:true,id:t.id,name:t.label,op:'Renfe',d,brg,card:CARD[Math.round(brg/45)%8],appr:pd!=null&&d<pd-.02,stopped:t.speed===0})}}
-  else for(const tr of TRAINS){const st=CUR[tr.id];if(!st)continue;const d=hav(u.lon,u.lat,st.lon,st.lat);
+  else for(const tr of []){const st=CUR[tr.id];if(!st)continue;const d=hav(u.lon,u.lat,st.lon,st.lat);
     const s2=trainState(tr,future),d2=hav(u.lon,u.lat,s2.lon,s2.lat);
     const p=Math.PI/180,dl=(st.lon-u.lon)*p,y=Math.sin(dl)*Math.cos(st.lat*p),x=Math.cos(u.lat*p)*Math.sin(st.lat*p)-Math.sin(u.lat*p)*Math.cos(st.lat*p)*Math.cos(dl);
     const brg=(Math.atan2(y,x)/p+360)%360;
@@ -959,17 +943,16 @@ function updateRings(){const nb=X.nb,on=nb.active;$('#userG').style.display=on?'
 const slider=(k,label,min,max,col)=>`<div class="slider"><label for="sl-${k}"><i style="background:${col}"></i>${label}</label><input id="sl-${k}" type="range" min="${min}" max="${max}" step="1" value="${X.settings[k]}" data-a="slider" data-k="${k}"><output id="out-${k}">${X.settings[k]} km</output></div>`;
 VIEWS.nearby={render(){const nb=X.nb;
   return{head:headHTML({title:'Trenes cercanos',sub:`Alrededor de tu posición · ${DEMOTAG}`})+`<div class="lvlbar" id="nbBanner">Calculando…</div>`,
-  body:`<div class="card"><div style="display:flex;gap:10px;align-items:center"><span class="arrow" style="background:var(--accent-soft);color:var(--accent)">${I.pin}</span><div style="flex:1;min-width:0"><b id="nbPosT">Posición de prueba</b><div style="font-size:12.5px;color:var(--text2)" id="nbPosS"></div></div></div>
-    <div class="btns"><button class="btn sm" data-a="useGps">Usar mi ubicación</button><button class="btn sm" data-a="nearTrack">Colocarme junto a una vía</button></div>
-    <label class="field" style="margin-bottom:0"><span>Mover mi posición de prueba a una estación</span><select id="nbSt" data-a="nbStation">${stOptions('')}</select></label>
+  body:`<div class="card"><div style="display:flex;gap:10px;align-items:center"><span class="arrow" style="background:var(--accent-soft);color:var(--accent)">${I.pin}</span><div style="flex:1;min-width:0"><b id="nbPosT">Posición en el mapa</b><div style="font-size:12.5px;color:var(--text2)" id="nbPosS"></div></div></div>
+    <div class="btns"><button class="btn sm" data-a="useGps">Usar mi ubicación</button></div>
+    <label class="field" style="margin-bottom:0"><span>Mover mi posición del mapa a una estación</span><select id="nbSt" data-a="nbStation">${stOptions('')}</select></label>
     <p class="note" style="margin-bottom:0">También puedes arrastrar el punto azul sobre el mapa.</p></div>
   <div class="set"><div class="sm"><b>Vigilancia de proximidad</b><small>Dibuja los anillos de aviso y lanza alertas en todas las pestañas.</small></div><button class="sw" role="switch" aria-checked="${nb.active}" data-a="nbToggle" aria-label="Vigilancia de proximidad"></button></div>
   <h3 class="sec">Trenes a tu alrededor</h3><div id="nbList"></div>
-  <h3 class="sec">Posibles cruces ferroviarios</h3><div id="nbCross"></div>
   <h3 class="sec">Distancias de aviso</h3>${slider('r1','Amarillo',6,80,'var(--lvl1)')}${slider('r2','Naranja',3,60,'var(--lvl2)')}${slider('r3','Rojo',1,30,'var(--lvl3)')}
-  <p class="note">Los avisos visuales se muestran dentro de la app. Las notificaciones nativas y el seguimiento en segundo plano no están disponibles en este entorno.</p>`}},
+  <p class="note">Los avisos se muestran dentro de la app mientras esté abierta. Un navegador no permite notificaciones del sistema ni seguimiento en segundo plano.</p>`}},
   live(){const nb=X.nb,S_=X.settings;const set=(id,v)=>{const e=$('#'+id);if(e&&e.innerHTML!==v)e.innerHTML=v};
-    set('nbPosT',nb.user.real?'Tu ubicación (GPS)':'Posición de prueba');
+    set('nbPosT',nb.user.real?'Tu ubicación (GPS)':'Posición en el mapa');
     set('nbPosS',(nb.gpsMsg?esc(nb.gpsMsg)+'<br>':'')+`${nb.user.lat.toFixed(3)}°, ${nb.user.lon.toFixed(3)}°`);
     const b=$('#nbBanner');if(b){const near=nb.list[0];b.className='lvlbar'+(nb.level?' l'+nb.level:'');
       b.innerHTML=!nb.active?'Vigilancia desactivada':near?(nb.level?`${lvlTxt[nb.level]}: ${esc(nm(near))} a ${fmtKm(near.d)} km`:`Sin avisos · tren más cercano a ${fmtKm(near.d)} km`):'Sin trenes'}
@@ -979,48 +962,39 @@ VIEWS.nearby={render(){const nb=X.nb;
            return`<button class="row" data-a="${o.real?'selReal':'selTrain'}" data-id="${o.real?esc(o.id):o.tr.id}"><span class="arrow" style="${lv?'background:var(--lvl'+lv+');color:'+(lv===3?'#fff':'#111'):''}"><span style="display:grid;transform:rotate(${o.brg.toFixed(0)}deg)">${I.arrow}</span></span><span class="rm"><b>${esc(nm(o))} · ${fmtKm(o.d)} km ${o.card}</b><small>${o.real?'Renfe':esc(o.tr.op)+' → '+esc(S[o.st.leg.ids[o.st.leg.ids.length-1]].short)} · ${o.stopped?'parado':o.appr?'se acerca':'se aleja'}</small></span>${lv?pill(['','Amarillo','Naranja','Rojo'][lv],lv===3?'p-crit':'p-warn'):''}</button>`}).join('')}}
     const C=$('#nbCross');if(C){if(!nb.active)C.innerHTML=emptyBox('Vigilancia desactivada','Actívala para calcular cruces.');
       else if(REAL.on)C.innerHTML=`<div class="empty" style="text-align:left;padding:6px 0">El cálculo de cruces solo está disponible con datos de demostración.</div>`;
-      else if(!nb.nearTrack||nb.nearTrack.km>2.5)C.innerHTML=emptyBox('No hay vías a menos de 2,5 km',`La vía más cercana está a ${nb.nearTrack?fmtKm(nb.nearTrack.km):'—'} km.`,`<button class="btn sm" data-a="nearTrack">Colocarme junto a una vía</button>`);
+      else if(!nb.nearTrack||nb.nearTrack.km>2.5)C.innerHTML=emptyBox('No hay vías a menos de 2,5 km',`La vía más cercana está a ${nb.nearTrack?fmtKm(nb.nearTrack.km):'—'} km.`,``);
       else if(!nb.cross.length)C.innerHTML=`<div class="empty" style="text-align:left;padding:6px 0">Hay una vía a ${fmtKm(nb.nearTrack.km)} km, pero ningún tren simulado la cruzará en los próximos 90 min.</div>`;
       else C.innerHTML=`<div class="note" style="margin-top:0">Vía a ${fmtKm(nb.nearTrack.km)} km de ti. Trenes que pasarán por el punto más próximo:</div>`+nb.cross.map(c=>`<button class="row" data-a="selTrain" data-id="${c.tr.id}"><span class="dotc" style="background:${c.tr.c}"></span><span class="rm"><b>${esc(trainName(c.tr))}</b><small>Pasa en ${fmtDur(c.secs)} (hora demo) · a ${fmtKm(c.dist)} km</small></span></button>`).join('')}}};
 
 /* ----- guardados ----- */
-VIEWS.saved={render(){const t=X.savedTab,F=X.favs;let body;
-  if(t==='fav'){const rt=F.routes.map((r,i)=>`<div class="row"><span class="rm"><b>${esc(S[r.a].short)} → ${esc(S[r.b].short)}</b><small>Trayecto favorito</small></span><button class="btn pri sm" data-a="useFavRoute" data-i="${i}">Iniciar</button><button class="ib" data-a="delFav" data-k="routes" data-i="${i}" aria-label="Quitar">${I.trash}</button></div>`).join('');
-    const tn=F.trains.map((id,i)=>`<div class="row"><span class="dotc" style="background:${TR[id].c}"></span><span class="rm"><b>${esc(trainName(TR[id]))}</b><small>${esc(S[TR[id].first].short)} ⇄ ${esc(S[TR[id].last].short)}</small></span><button class="btn sm" data-a="selTrain" data-id="${id}">Ver</button><button class="ib" data-a="delFav" data-k="trains" data-i="${i}" aria-label="Quitar">${I.trash}</button></div>`).join('');
-    const sn=F.stations.map((id,i)=>`<div class="row"><span class="rm"><b>${esc(S[id].name)}</b><small>Estación</small></span><button class="btn sm" data-a="selStation" data-id="${id}">Ver</button><button class="ib" data-a="delFav" data-k="stations" data-i="${i}" aria-label="Quitar">${I.trash}</button></div>`).join('');
-    body=(rt||tn||sn)?(rt?'<h3 class="sec">Trayectos</h3>'+rt:'')+(tn?'<h3 class="sec">Trenes</h3>'+tn:'')+(sn?'<h3 class="sec">Estaciones</h3>'+sn:''):emptyBox('Aún no tienes favoritos','Toca la estrella en un tren, una estación o un viaje para guardarlo aquí.')}
-  else body=X.hist.length?X.hist.map((h,i)=>`<div class="row"><span class="rm"><b>${esc(S[h.a].short)} → ${esc(S[h.b].short)}</b><small>${esc(h.name)} · ${esc(h.when)} (hora demo) · ${esc(h.state)}</small></span><button class="btn sm" data-a="repeatHist" data-i="${i}">Repetir</button></div>`).join('')+`<div class="btns"><button class="btn dan sm" data-a="clearHist">Borrar historial</button></div>`:emptyBox('Sin viajes guardados','Cuando finalices un viaje aparecerá aquí.');
-  return{head:headHTML({title:'Guardados',sub:`Favoritos e historial · ${DEMOTAG}`})+`<div class="seg" style="margin-top:10px" role="tablist"><button class="${t==='fav'?'on':''}" data-a="savedTab" data-t="fav" role="tab">Favoritos</button><button class="${t==='hist'?'on':''}" data-a="savedTab" data-t="hist" role="tab">Historial (${X.hist.length})</button></div>`,body}}};
+VIEWS.saved={render(){const F=X.favs;
+  const tn=F.trains.map((f,i)=>`<div class="row"><span class="dotc" style="background:var(--accent)"></span><span class="rm"><b>${esc(f.label)}</b><small>${REAL.list.find(t=>t.id===f.id)?'Circulando ahora':'No aparece en el feed'}</small></span><button class="btn sm" data-a="selReal" data-id="${esc(f.id)}">Ver</button><button class="ib" data-a="delFav" data-k="trains" data-i="${i}" aria-label="Quitar">${I.trash}</button></div>`).join('');
+  const sn=F.stations.map((id,i)=>`<div class="row"><span class="rm"><b>${esc(S[id].name)}</b><small>Estación</small></span><button class="btn sm" data-a="selStation" data-id="${id}">Ver</button><button class="ib" data-a="delFav" data-k="stations" data-i="${i}" aria-label="Quitar">${I.trash}</button></div>`).join('');
+  const body=(tn||sn)?(tn?'<h3 class="sec">Trenes</h3>'+tn:'')+(sn?'<h3 class="sec">Estaciones</h3>'+sn:''):emptyBox('Aún no tienes favoritos','Toca la estrella en un tren o una estación para guardarlo aquí.');
+  return{head:headHTML({title:'Guardados',sub:'Tus trenes y estaciones favoritos'}),body}}};
 
 /* ----- ajustes ----- */
 const swRow=(k,t,d)=>`<div class="set"><div class="sm"><b>${t}</b><small>${d}</small></div><button class="sw" role="switch" aria-checked="${!!X.settings[k]}" data-a="setBool" data-k="${k}" aria-label="${esc(t)}"></button></div>`;
 const segRow=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(X.settings[k])===String(v)?'on':''}" data-a="setVal" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
 VIEWS.settings={render(){
-  return{head:headHTML({title:'Ajustes y privacidad',sub:'RailTrack España · demostración'}),
+  return{head:headHTML({title:'Ajustes y privacidad',sub:'RailTrack España'}),
   body:`<h3 class="sec">Apariencia</h3>${segRow('theme',[['auto','Sistema'],['light','Claro'],['dark','Oscuro']])}
-  <h3 class="sec">Fuente de datos</h3>${segRow('source',[['auto','Automática'],['real','En directo'],['demo','Demo']])}
-  <p class="note">${REAL.on?'Mostrando '+REAL.list.length+' trenes en directo (Renfe, datos abiertos).':esc(REAL.err)||'En directo no está disponible en esta página; se usa la demostración.'} La opción Automática usa datos reales si el servidor responde y la demo si no.</p>
-  <h3 class="sec">Simulación</h3><div class="card" style="margin-top:0"><b>Velocidad de la demo</b><p class="note" style="margin:4px 0 10px">×1 es tiempo real. Con ×120, 1 s equivale a 2 min.</p>${segRow('speed',SPEEDS.map(s=>[s,'×'+s]))}</div>
-  ${swRow('pausa','Pausar simulación','Congela los trenes y el reloj demo.')}
-  <h3 class="sec">Mapa</h3>${swRow('lines','Líneas convencionales','Muestra las líneas de red convencional (discontinuas).')}${swRow('labels','Nombres de estaciones','Etiquetas junto a cada estación.')}
-  <h3 class="sec">Notificaciones</h3>${swRow('nProx','Aviso de proximidad','Cuando un tren entra en un anillo de aviso.')}${swRow('nStop','Próxima parada','Aviso al acercarte a tu siguiente parada.')}${swRow('nArr','Llegada','Aviso al llegar a tu destino.')}${swRow('nDelay','Retrasos','Aviso si tu tren sale con retraso.')}
-  <div class="btns"><button class="btn sm" data-a="testNotif">${I.bell} Enviar aviso de prueba</button></div>
-  <p class="note">Las notificaciones nativas del sistema no están disponibles en este entorno: los avisos aparecen dentro de la app y se marcan como simulados.</p>
-  <h3 class="sec">Ubicación</h3>${swRow('gps','Permitir intentar GPS','Se usa solo al pulsar «Usar mi ubicación» en Trenes cercanos. Si el entorno no lo permite, se usa una posición de prueba.')}
-  <h3 class="sec">Dynamic Island y Live Activities</h3>${swRow('island','Simulación de Dynamic Island','Muestra una cápsula simulada con tu viaje o alertas. No es la Dynamic Island real.')}
-  <div class="btns"><button class="btn sm" data-a="liveOpen">${I.phone} Ver Live Activity simulada</button></div>
+  <h3 class="sec">Mapa</h3>${swRow('lines','Red de apoyo','Muestra la red simplificada cuando aún no hay vías detalladas.')}${swRow('labels','Nombres de estaciones','Etiquetas junto a cada estación.')}
+  <h3 class="sec">Avisos</h3>${swRow('nProx','Aviso de proximidad','Cuando un tren entra en uno de los anillos de aviso (en Cerca).')}
+  <p class="note">Los avisos aparecen dentro de la app mientras está abierta. Un navegador no permite notificaciones del sistema ni seguimiento en segundo plano.</p>
+  <h3 class="sec">Ubicación</h3>${swRow('gps','Permitir GPS','Solo se usa al pulsar «Usar mi ubicación» en Cerca. Si el navegador lo deniega, puedes colocar tu posición en el mapa.')}
   <h3 class="sec">Datos y privacidad</h3>
-  <div class="card"><b>Datos simulados</b><p class="note" style="margin:4px 0 0">Trenes, horarios, retrasos y posiciones son generados en tu dispositivo para la demostración. No proceden de Renfe, Adif, iryo ni OUIGO y no deben usarse para viajar. Las estaciones y líneas son aproximadas.</p></div>
-  <div class="card"><b>Tus datos</b><p class="note" style="margin:4px 0 0">No se envía nada a ningún servidor. Favoritos, historial y ajustes se guardan solo en este navegador${storageOK?'':' (el almacenamiento local no está disponible aquí, así que se perderán al cerrar)'}. El texto de un billete que pegues se analiza en el dispositivo.</p></div>
+  <div class="card"><b>Origen de los datos</b><p class="note" style="margin:4px 0 0">Posiciones y retrasos: datos abiertos de Renfe (GTFS-Realtime, CC BY 4.0). Vías: © OpenStreetMap contributors (ODbL). iryo y OUIGO no publican datos abiertos, por eso no aparecen. Aplicación independiente, sin relación con Renfe.</p></div>
+  <div class="card"><b>Tus datos</b><p class="note" style="margin:4px 0 0">No se guarda tu ubicación en ningún servidor. Favoritos y ajustes se guardan solo en este navegador${storageOK?'':' (el almacenamiento local no está disponible, así que se perderán al cerrar)'}.</p></div>
   <div class="btns"><button class="btn dan sm" data-a="wipe">${I.trash} Borrar datos locales</button></div>`}}};
 
 /* ---------- navegación ---------- */
-const TABS=[['map','Mapa',I.map],['trip','Viaje',I.train],['nearby','Cerca',I.near],['saved','Guardados',I.star],['settings','Ajustes',I.gear]];
+const TABS=[['map','Mapa',I.map],['trip','Siguiendo',I.train],['nearby','Cerca',I.near],['saved','Guardados',I.star],['settings','Ajustes',I.gear]];
 $('#tabbar').innerHTML=TABS.map(([t,l,i])=>`<button class="tab" data-a="tab" data-t="${t}" aria-label="${l}">${i}<span>${l}</span></button>`).join('');
 function setTabUI(){$$('.tab').forEach(b=>{const on=b.dataset.t===X.tab;b.classList.toggle('on',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
 function setTab(t){X.tab=t;setTabUI();let v;
   if(t==='map')v=X.selReal?'real':X.selTrain?'train':X.selStation?'station':'list';
-  else if(t==='trip')v=X.trip?'trip':'tripSetup';else v=t;
+  else if(t==='trip')v='follow';else v=t;
   if(t==='nearby'&&!X.nb.active){X.nb.active=true;nearbyCalc();updateRings()}
   setView(v);if(t==='nearby')flyTo(WXf(X.nb.user.lon),WYf(X.nb.user.lat),2.2,'half')}
 
@@ -1031,7 +1005,7 @@ function closeModal(){modal.hidden=true;modal.innerHTML='';modalLiveFn=null}
 modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!modal.hidden)closeModal();else closeResults()}});
 function toast(title,body,bad){const t=document.createElement('div');t.className='toast'+(bad?' bad':'');t.innerHTML=`<div><b>${esc(title)}</b>${body?`<small>${esc(body)}</small>`:''}</div>`;$('#toasts').append(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),320)},3200);while($('#toasts').children.length>2)$('#toasts').firstChild.remove()}
-function notify(title,body,lvl){toast('🔔 '+title,body+' (notificación simulada dentro de la app)',lvl===3);pulseIsland()}
+function notify(title,body,lvl){toast('🔔 '+title,body+' (aviso dentro de la app)',lvl===3);pulseIsland()}
 function filterModal(){const f=X.filters;
   const ops=OPS.map(o=>`<button class="chip ${f.opOff.has(o)?'off':'on'}" style="--c:var(--accent)" data-a="chipOp" data-o="${o}" aria-pressed="${!f.opOff.has(o)}"><i></i>${o}</button>`).join('');
   const svs=Object.keys(SVC).map(k=>`<button class="chip ${f.svcOff.has(k)?'off':'on'}" style="--c:${SVC[k].c}" data-a="chipSvc" data-s="${k}" aria-pressed="${!f.svcOff.has(k)}"><i></i>${SVC[k].n}</button>`).join('');
@@ -1096,11 +1070,15 @@ function tripWatch(){const t=X.trip;if(!t)return;const lv=tripLive(t,sim.t);
 
 /* ---------- ciclo de actualización de la interfaz ---------- */
 let liveN=0;
-function liveTick(force){try{updateClock();nearbyCalc();updateRings();const v=VIEWS[X.view];if(v&&v.live)v.live();updateIsland();updateBanner();tripWatch();if(modalLiveFn)modalLiveFn()}catch(e){console.error('live',e)}}
+function liveTick(force){try{updateClock();nearbyCalc();updateRings();const v=VIEWS[X.view];if(v&&v.live)v.live();updateBanner();if(modalLiveFn)modalLiveFn()}catch(e){console.error('live',e)}}
 setInterval(()=>liveTick(),500);
 
 /* ---------- acciones ---------- */
 const A={
+ followReal(e,d){X.follow=d.id;markSel();setTab('trip');toast('Siguiendo el tren')},
+ unfollow(){X.follow=null;markSel();setView('follow')},
+ centerFollow(){const r=REAL.els[X.follow];if(r)flyTo(r.tx,r.ty,4,'half')},
+ favReal(e,d){const a=X.favs.trains,i=a.findIndex(f=>f.id===d.id);if(i<0){const t=REAL.list.find(x=>x.id===d.id);a.push({id:d.id,label:t?t.label:d.id})}else a.splice(i,1);persist();e.currentTarget.classList.toggle('on',i<0);toast(i<0?'Tren añadido a favoritos':'Tren quitado de favoritos')},
  selReal(e,d){closeResults();selectReal(d.id)},
  centerReal(){const r=REAL.els[X.selReal];if(r)flyTo(r.tx,r.ty,4,'half')},
  retryReal(){pollReal()},
@@ -1153,11 +1131,11 @@ const A={
   else if(txt)go(txt);else err.textContent='Pega el texto del billete o elige un archivo.'},
  tkUse(e,d){X.form={a:d.a2,b:d.b2,num:d.n||'',time:d.t||fmtT(sim.t),results:null,err:''};closeModal();X.tab='trip';setTabUI();setView(X.trip?'trip':'tripSetup');if(!X.trip)setTimeout(()=>runSearch(),50)},
  useGps(){const nb=X.nb;if(!X.settings.gps){nb.gpsMsg='La ubicación está desactivada en Ajustes.';return}
-  nb.gpsMsg='Buscando tu ubicación…';let done=false;const fail=m=>{if(done)return;done=true;nb.gpsMsg=m;toast('Ubicación no disponible','Usa la posición de prueba: arrastra el punto azul o elige una estación.',true)};
-  try{if(!navigator.geolocation)return fail('Este entorno no permite acceder al GPS. Se mantiene la posición de prueba.');
+  nb.gpsMsg='Buscando tu ubicación…';let done=false;const fail=m=>{if(done)return;done=true;nb.gpsMsg=m;toast('Ubicación no disponible','Usa la posición del mapa: arrastra el punto azul o elige una estación.',true)};
+  try{if(!navigator.geolocation)return fail('Este entorno no permite acceder al GPS. Se mantiene la posición del mapa.');
     navigator.geolocation.getCurrentPosition(p=>{if(done)return;done=true;nb.user={lon:p.coords.longitude,lat:p.coords.latitude,real:true};nb.gpsMsg='Ubicación obtenida. El seguimiento en segundo plano no está disponible.';nb.active=true;applyView();nearbyCalc();flyTo(WXf(nb.user.lon),WYf(nb.user.lat),2,'half')},
-      err=>fail(err&&err.code===1?'Permiso de ubicación denegado. Se mantiene la posición de prueba.':'No se pudo obtener la ubicación. Se mantiene la posición de prueba.'),{timeout:6000,maximumAge:60000});
-    setTimeout(()=>fail('Sin respuesta de la ubicación. Se mantiene la posición de prueba.'),7000)}catch(e){fail('Este entorno no permite acceder al GPS. Se mantiene la posición de prueba.')}},
+      err=>fail(err&&err.code===1?'Permiso de ubicación denegado. Se mantiene la posición del mapa.':'No se pudo obtener la ubicación. Se mantiene la posición del mapa.'),{timeout:6000,maximumAge:60000});
+    setTimeout(()=>fail('Sin respuesta de la ubicación. Se mantiene la posición del mapa.'),7000)}catch(e){fail('Este entorno no permite acceder al GPS. Se mantiene la posición del mapa.')}},
  nearTrack(){const nb=X.nb;nb.active=true;nearbyCalc();const b=nb.nearTrack;if(!b)return;const dx=b.px-WXf(nb.user.lon),dy=b.py-WYf(nb.user.lat),n=Math.hypot(dx,dy)||1;
   const off=0.35*KMU;nb.user={lon:LONf(b.px-dx/n*off),lat:LATf(b.py-dy/n*off),real:false};if(n<1e-3)nb.user={lon:LONf(b.px+off),lat:LATf(b.py),real:false};nb.gpsMsg='';applyView();nearbyCalc();updateRings();flyTo(b.px,b.py,3,'half');liveTick()},
  nbStation(e){const id=e.target.value;if(!id)return;const s=S[id];X.nb.user={lon:s.lon+0.03,lat:s.lat+0.025,real:false};X.nb.gpsMsg='';X.nb.active=true;applyView();nearbyCalc();updateRings();flyTo(s.x,s.y,3,'half');liveTick()},
